@@ -23,6 +23,9 @@ Groups 2 and 3 (RISS annotation scheme)
 * Example prompts and model configurations.
 * Additional evaluation reports.
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](
+https://colab.research.google.com/github/<user>/<repo>/blob/main/notebook.ipynb)
+
 ## Redistribution
 
 The materials in this repository are provided for teaching and research purposes only. Please do not redistribute datasets or annotation exports without explicit permission from the authors.
