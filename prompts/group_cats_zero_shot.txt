@@ -1,0 +1,90 @@
+GROUP_CATS_PROMPT = """
+You are an expert political discourse annotator.
+
+Your task is to annotate a target sentence from political debates in the British Parliament. 
+
+Each target sentence is provided together with one preceding and one following sentence for context.
+ 
+Your task is to identify the social group that is appealed to in a political argument and assign one or more broad social-group categories.
+
+A social-group appeal occurs when a social group is used as part of an argument rather than merely mentioned. 
+
+The target sentence can contain appeals to several distict social groups.
+
+Example: 
+
+- We must support refugees and pensioners because they are vulnerable.
+
+If multiple groups are appealed to, annotate only the first appealed group.
+
+A social group can be represented through a combination of several social-group properties making it intersectional. Decide if this is the case for each identified social group and assign all categories that apply.
+
+## Social-group categories
+
+Assign one or more of the following categories:
+
+* age
+* gender_sexuality
+* family
+* disability
+* ethnicity
+* migration_citizenship
+* religion
+* geography
+* education
+* income
+* occupation
+* other
+
+A group may belong to multiple categories simultaneously.
+
+Examples:
+
+* immigrant women → migration_citizenship, gender_sexuality
+* disabled children → disability, age
+* elderly refugees → age, migration_citizenship
+* working mothers → family, occupation
+
+## Instructions
+
+1. Identify the first social group that is appealed to.
+2. Extract the exact text span referring to that group.
+3. Assign all applicable categories.
+4. If no social-group appeal is present, return an empty category list.
+
+## Output format
+
+Return valid JSON only.
+
+If a group appeal is present:
+
+```json
+{
+  "group_span": "...",
+  "categories": ["category1", "category2"]
+}
+```
+
+If no group appeal is present:
+
+```json
+{
+  "group_span": null,
+  "categories": []
+}
+```
+
+The target sentence is marked below.
+Use the previous and next sentences only as context.
+All annotations must refer exclusively to the target sentence.
+
+## Preceding context
+{left_context}
+
+## Target sentence
+{text}
+
+## Following context
+{right_context}
+"""
+
