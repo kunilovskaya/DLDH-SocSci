@@ -1,0 +1,91 @@
+dimension	ls_column	category_order	group_order	category	group	pop_up_instruction	tag
+flags	0	0	10	binary	group_mentioned	No social group is mentioned in the target sentence.	group_mentioned
+flags	0	0	20	binary	group_appealed	A social group is mentioned, but the mention is descriptive. The group is not invoked to justify, criticize, support, oppose, or motivate a policy position. E.g. ``Immigrants live in Germany.'' A group appeal occurs when a social group is used as part of the argument, not merely mentioned. The group may be presented as affected by a problem, causing a problem, deserving praise or blame, or as the target of a proposed action.Examples: ``Immigrants are struggling’’ (problem), ``Because immigrants do X...’’ (cause), ``Working mothers deserve support’’ (evaluation), ``We should help Roma families’’ (remedy).	group_appealed
+flags	0	0	30	binary	intersectional	If two or more groups were selected, also tick the intersectional flag.	intersectional
+flags	0	0	40	binary	multiple_groups	Flag sentences containing appeals to several separate groups	multiple_groups
+flags	0	0	50	binary	opposed_groups	Use this flag when groups are explicitly contrasted, compared, or set against each other. Common markers: ``vs.'', ``compared to'', ``wherea'', ``unlike'', ``rather than'', ``as opposed to'' parallel constructions: ``immigrant men … native women …''	opposed_groups
+flags	0	0	60	binary	pejorative	Use when a group is referred to with a derogatory, insulting, stigmatizing, or slang term (e.g. ``NAFRI'' instead of ``Nordafrikaner'' or  ``Asylant'' instead of ``Asylsuchender'', ``Welfare queen'' instead of ``welfare recipient''). The social group should be coded as usual; this flag captures only the use of the pejorative label.Note that regional labels can change connotation depending on the context. For example: Geordie (Newcastle). Brummie (Birmingham), Scouser (Liverpool), Yankees (Amerikans), Paddy and Mick for Irish, Jock for Scottish, Taff for Welsh, Ossi for East Germans, etc	pejorative
+horizontal	1	10	10	age	unborn	young children below school age	AGE_UNBORN
+horizontal	1	10	20	age	pre-school	young children below school age	AGE_PRESCH
+horizontal	1	10	30	age	school age	children attending school	AGE_SCHOOL
+horizontal	1	10	40	age	children	general appeal to children, without age specification	AGE_CHILD
+horizontal	1	10	50	age	young adults	adolescents and young adults (approx. 18--30)	AGE_YOUNGAD
+horizontal	1	10	60	age	mature people	working-age adults	AGE_MATURE
+horizontal	1	10	70	age	seniors	elderly, retired people	AGE_SENIOR
+horizontal	1	10	80	age	retired	retirees (life stage): Prefer life-stage labels (retired, students) when the text emphasizes that status rather than age number.	AGE_RETIRED
+horizontal	1	20	10	gender_sexuality	men	male gender category	GEN_MEN
+horizontal	1	20	20	gender_sexuality	women	female gender category	GEN_WOMEN
+horizontal	1	20	30	gender_sexuality	transgender	transgender identity	GEN_TRANS
+horizontal	1	20	40	gender_sexuality	gender-diverse	gender identities outside binary male/female categories (umbrella category)	GEN_DIVERSE
+horizontal	1	20	50	gender_sexuality	non-binary	non-binary gender identity	GEN_NONBINARY
+horizontal	1	20	60	gender_sexuality	heterosexual	heterosexual orientation	GEN_SOGI_HET
+horizontal	1	20	70	gender_sexuality	LGBT(+)	lesbian, gay, bisexual identities	GEN_LGBT
+horizontal	1	30	10	family	mothers	women with children: If women are mentioned only as mothers (e.g., single moms), label FAM_MOTHERS; label also GEN_WOMEN only if gender is explicitly invoked beyond the role.	FAM_MOTHERS
+horizontal	1	30	20	family	fathers	men with children	FAM_FATHERS
+horizontal	1	30	30	family	single parents	a parent raising children alone	FAM_SINGLE_PARENTS
+horizontal	1	30	40	family	childless	adults without children	FAM_CHILDLESS
+horizontal	1	30	50	family	single mothers	women raising one or more children without a partner or spouse in the household	FAM_SINGLE_MOTHERS
+horizontal	1	30	60	family	parents	individuals with children	FAM_PARENTS
+horizontal	1	30	70	family	grandparents	older family members with grandchildren	FAM_GRANDPARENTS
+horizontal	1	30	80	family	families	people living as a single houshold	FAM_FAMILIES
+horizontal	1	30	90	family	large families	families with multiple children	FAM_LARGE_FAMILIES
+horizontal	1	40	10	disability	disabled people	people with disabilities	DIS_DISABLED
+horizontal	1	40	20	disability	chronic illness	people with long-term health conditions	DIS_CHRONIC
+horizontal	1	40	30	disability	neurodivergent	autism, ADHD, and other neurodivergent conditions	DIS_NEURODIV
+horizontal	2	50	10	ethnicity	ethnic minority	ethnic / ethno-cultural minority; does not require a MIG_* code. If religion is used as an ethnic proxy, also assign religion category. Do not infer ethnicity from names, passports, languages, or locations alone. Use this group only when the text itself constructs the group as an ethnic or ethno-cultural category.	ETH_MINORITY
+horizontal	2	50	20	ethnicity	named origin group	explicitly named ethnic or national origin group; does not require a MIG_* code	ETH_NAMED
+horizontal	2	60	10	migration	immigrants	first-generation migrants, foreigners (unless context is purely nationality. If also framed ethnically, add “ethnic minority”. Assign migration groups only when migration is part of the group definition. Separate migration identity from legal status. Do not force a migration code on ethnic minorities without migration background.	MIG_IMMIGRANTS
+horizontal	2	60	20	migration	refugees	asylum seekers or refugees	MIG_REFUGEES
+horizontal	2	60	30	migration	descendants	second-generation migrants, descendants of immigrants	MIG_DESCENDANTS
+horizontal	2	60	40	migration	resettler	co-ethnic return migrants, repatriates, ancestry-based migrant identities	MIG_RESETTLERS
+horizontal	2	60	50	migration	majority	dominant ethno-national group, majority / hegemonic group, national identities, citizens of the country; Majority is especially relevant in oppositional constructions (ON) where the in-group is contrasted with immigrants or ethnic minorities.	MIG_MAJORITY
+horizontal	2	60	60	migration	undocumented	individuals without citizenship	MIG_UNDOCUMENTED
+horizontal	2	60	70	migration	non-citizens	individuals who acquired citizenship	MIG_CIT_NON_CITIZENS
+horizontal	2	60	80	migration	naturalized persons	migrants without legal status	MIG_CIT_NATURALIZED
+horizontal	2	70	10	religion	secular	non-religious individuals	REL_SECULAR
+horizontal	2	70	20	religion	christian	Christians	REL_CHRISTIAN
+horizontal	2	70	30	religion	muslim	Muslims	REL_MUSLIM
+horizontal	2	70	40	religion	jewish	Jewish people	REL_JEWISH
+horizontal	2	70	50	religion	other religion	other religious affiliations. If a religious labels functions as ethnic or cultural group markers rather than references to faith, assign both the religion and ethnicity gropus.	REL_OTHER
+horizontal	2	80	10	geography	urban	people living in cities. Use only when the group is defined by place, not incidental location	GEO_URBAN
+horizontal	2	80	20	geography	rural	people living in rural areas. Use only when the group is defined by place, not incidental location	GEO_RURAL
+horizontal	2	80	30	geography	region-specific	inhabitants of named regions (e.g., East Germany, Ulster)	GEO_REGION
+horizontal	2	80	40	geography	affluent regions	people from or in economically prosperous areas	GEO_AFFLUENT
+horizontal	2	80	50	geography	disadvantaged regions	people from or in economically deprived areas	GEO_DISADV
+vertical	3	90	10	education	educated	highly educated, university graduates, academics, PhD holders, educated elite	EDU_HIGH
+vertical	3	90	20	education	mid-level	secondary education, vocational training, mid-qualified	EDU_MID
+vertical	3	90	30	education	low-educated	low educated, no degree, school dropouts	EDU_LOW
+vertical	3	90	40	education	in education	students, trainees, apprentices (if the emphasis is schooling status). If students are mentioned but level unclear, use EDU_IN_EDU	EDU_IN_EDU
+vertical	3	90	50	education	skilled	skilled, trained, certified (when “skill” not clearly education)	EDU_SKILLED
+vertical	3	90	60	education	unskilled	unskilled, low-skilled (when “skill” not clearly education)	EDU_UNSKILLED
+vertical	3	100	10	income	rich/wealthy	people of high income or wealth; elites==rich unless explicitly educational or political (then allow multi-label)	INC_RICH
+vertical	3	100	20	income	middle class	middle income groups: middle class, lower-middle, upper-middle	INC_MIDDLE_CLASS
+vertical	3	100	30	income	poor/low-income	low income groups: poor, low-income, impoverished, struggling families	INC_LOW_INCOME
+vertical	3	100	40	income	working class	working class (if framed as class, not occupation, e.g. in inequality terms: workers vs. elites)	INC_WORKING_CLASS
+vertical	3	100	50	income	precarious/unemployed	economically insecure individuals: precarious, economically insecure, unemployed, jobless, out of work, low-wage earners	INC_PRECARIOUS
+vertical	3	100	60	income	welfare recipients	people receiving social benefits: welfare recipients, social assistance recipients (if explicit)	INC_WELFARE_RECIPIENTS
+vertical	3	110	10	occupation	managers/executives	leadership and executive positions: managers, executives, CEOs	OCC_MANAGERS
+vertical	3	110	20	occupation	professionals	professionals (lawyers, engineers, etc.)	OCC_PROFESSIONALS
+vertical	3	110	30	occupation	semi-professionals	technicians, associate professionals, skilled clerks (when framed as occupation, not education)	OCC_SEMIPROFESSIONALS
+vertical	3	110	40	occupation	workers	workers, laborers, blue-collar (if paired with workplace terms e.g. factory workers	OCC_WORKERS
+vertical	3	110	50	occupation	service workers	service sector employees: service industry, retail, hospitality	OCC_SERVICE_WORKERS
+vertical	3	110	60	occupation	employed	people in gainful occupations	OCC_EMPLOYED
+vertical	3	110	70	occupation	public sector	government employees: civil servants, government workers (employed by the state if explicit)	OCC_PUBLIC_SECTOR
+vertical	3	110	80	occupation	agriculture	farmers, agricultural workers	OCC_AGRICULTURE
+vertical	3	110	90	occupation	arts	theatre, cinema, fine arts, entertainment and arts industry workers	OCC_ARTS
+vertical	3	110	100	occupation	extractive	extractive-sector workers: miners, oil industry workers	OCC_EXTRACTIVE
+vertical	3	110	110	occupation	healthcare	doctors, nurses, carers	OCC_HEALTHCARE
+vertical	3	110	120	occupation	educators	teachers, educators, academic staff	OCC_EDUCATORS
+vertical	3	110	130	occupation	self-employed	freelancers, entrepreneurs, small business owners	OCC_SELF_EMPLOYED
+		120	10	other_groups	non-RISS	any social group that falls outside RISS taxonomy: homeowners, tenants, taxpayers, consumers, beneficiaries, social media users, workers in British Laylends (institutionally-defined subgroups)	OTH_NON_RISS
+appeal_tags	4	200	10	reasoning	economic	The argument about the group is based primarily on material resources, jobs, wages, skills, productivity, economic performance, taxes, public spending, welfare costs, fiscal sustainability, or economic incentives. Examples: labour shortages, unemployment, wage competition, tax burden, benefit dependency, productivity, growth, public budgets.	REASONING_ECONOMIC
+appeal_tags	4	200	20	reasoning	cultural	The argument about the group is based primarily on identity, values, norms, religion, language, traditions, belonging, social cohesion, national identity, cultural compatibility, or symbolic boundaries. Examples: protecting national culture, shared values, integration, family values, social cohesion, who belongs, threats to identity.	REASONING_CULTURAL
+appeal_tags	4	200	30	reasoning	both	The argument relies on both economic and cultural reasoning, and neither dimension can be removed without substantially changing the justification. Example: Immigration depresses wages and undermines our way of life., We need skilled migrants to support the economy, but they must adopt our values.	REASONING_BOTH
+appeal_tags	4	200	40	reasoning	unclear	The text contains a group appeal, but the reasoning cannot be reliably classified as economic or cultural, or there is insufficient information to determine the primary basis of the argument.	REASONING_UNCLEAR
+appeal_tags	4	210	10	polarity	pro-group	The group is presented positively or as deserving support, protection, inclusion, resources, rights, recognition, or improved outcomes. Examples: Immigrants make an important contribution to society., We should invest more in disadvantaged children.	POLARITY_PRO_GROUP
+appeal_tags	4	210	20	polarity	anti-group	The group is presented negatively or as deserving criticism, blame, exclusion, restrictions, reduced support, or worse outcomes. Examples: We must restrict access for asylum seekers., Benefits for the unemployed should be reduced.	POLARITY_ANTI_GROUP
+appeal_tags	4	210	30	polarity	mixed	The group is framed both positively and negatively, or both supported and restricted, such that no clear overall polarity can be assigned. Use only when neither pro-group nor anti-group clearly dominates. Example: We must support unemployed people, but benefits should be made more conditional.	POLARITY_MIXED
+appeal_tags	4	220	10	stance	endorse	The speaker accepts and relies on the group appeal. The group-based reasoning is presented as valid and used to support the argument. Example: Working families are struggling, so they should get tax relief.	STANCE_ENDORSE
+appeal_tags	4	220	20	stance	reject	The speaker disputes, rejects, or invalidates the group appeal. The group-based reasoning is presented as incorrect, unfair, or irrelevant. Example: It’s not immigrants causing housing shortages—it’s zoning.	STANCE_REJECT
+appeal_tags	4	220	30	stance	partial	The speaker partially accepts the group appeal but limits, modifies, reframes, or contests it. Examples: Immigration may affect wages in some sectors, but it is not the main driver., I agree low-income families need support, but this policy targets the wrong ones.	STANCE_PARTIAL
+appeal_tags	4	220	40	stance	unclear	The speaker's stance toward the group appeal cannot be determined.	STANCE_UNCLEAR
