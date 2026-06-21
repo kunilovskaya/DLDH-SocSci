@@ -59,19 +59,19 @@ Return valid JSON only.
 If a group appeal is present:
 
 ```json
-{
+{{
   "group_span": "...",
   "categories": ["category1", "category2"]
-}
+}}
 ```
 
 If no group appeal is present:
 
 ```json
-{
+{{
   "group_span": null,
   "categories": []
-}
+}}
 ```
 
 The target sentence is marked below.

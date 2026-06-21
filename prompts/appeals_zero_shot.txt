@@ -72,11 +72,11 @@ Examples:
 ## Output format
 
 ```json
-{
+{{
   "reasoning": "economic|cultural|both|unclear",
   "polarity": "pro-group|anti-group|mixed",
   "stance": "endorse|reject|partial|unclear"
-}
+}}
 ```
 
 ## Previous sentence

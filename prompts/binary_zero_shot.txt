@@ -63,13 +63,13 @@ Examples:
 
 Return valid JSON only:
 
-{
+{{
   "group_mentioned": "yes|no",
   "group_appealed": "yes|no",
   "multiple_groups": "yes|no",
   "opposed_groups": "yes|no",
   "pejorative": "yes|no"
-}
+}}
 
 The target sentence is marked below.
 Use the previous and next sentences only as context.
