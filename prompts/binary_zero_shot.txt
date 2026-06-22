@@ -7,7 +7,7 @@ Each target sentence is provided together with one preceding and one following s
 
 For each category, determine whether the described phenomenon is present in the target sentence and assign either "yes" or "no".
 
-## Annotation categories and instructions
+## Annotation fields and instructions
 -----------
 
 group_mentioned:
@@ -61,15 +61,21 @@ Examples:
 
 ## Output format
 
-Return valid JSON only:
+Return a JSON object.
+Choose either "yes" or "no" for every annotatoion field.
+Example
 
-{{
-  "group_mentioned": "yes|no",
-  "group_appealed": "yes|no",
-  "multiple_groups": "yes|no",
-  "opposed_groups": "yes|no",
-  "pejorative": "yes|no"
-}}
+Target sentence:
+Disabled people will receive additional support.
+
+Output:
+{
+  "group_mentioned": "yes",
+  "group_appealed": "yes",
+  "multiple_groups": "no",
+  "opposed_groups": "no",
+  "pejorative": "no"
+}
 
 The target sentence is marked below.
 Use the previous and next sentences only as context.
