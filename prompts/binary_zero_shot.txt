@@ -69,13 +69,13 @@ Target sentence:
 Disabled people will receive additional support.
 
 Output:
-{
+{{
   "group_mentioned": "yes",
   "group_appealed": "yes",
   "multiple_groups": "no",
   "opposed_groups": "no",
   "pejorative": "no"
-}
+}}
 
 The target sentence is marked below.
 Use the previous and next sentences only as context.
