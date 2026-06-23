@@ -674,7 +674,7 @@ def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='lib
     return iaa_df, tag_iaa_df, cat_iaa_df
 
 
-RUN = "trial_student_groups"  # "main_student_groups", "trial_student_groups"
+RUN = "main_student_groups"  # "main_student_groups", "trial_student_groups"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--intab', help="", default=f'res/{RUN}/transformed_dataset.tsv')
@@ -865,7 +865,7 @@ if __name__ == "__main__":
     # drop rows where incomplete or adjudicate = "yes" for the gold standard, as these need to be revised by annotators
     gold_df_out = gold_df.loc[gold_df["adjudicate"] == "no"].reset_index(drop=True)
 
-    gold_df_out = gold_df_out.drop(['adjudicate', 'incomplete', 'speaker', 'party', 'dataset', 'annotation_id'], axis=1)
+    gold_df_out = gold_df_out.drop(['adjudicate', 'incomplete', 'dataset', 'annotation_id'], axis=1)
 
     print(f"\nGold dataset with {len(gold_df_out)} rows and {len(gold_df_out.columns)} columns:")
     print(f"\t--- after removing {len(to_adjudicate)} adjudication-needed items ---")
