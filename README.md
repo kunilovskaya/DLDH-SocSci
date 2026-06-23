@@ -34,9 +34,6 @@ referred to as "main_student_groups".
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kunilovskaya/DLDH-SocSci/blob/main/zero-shot.ipynb)
 
-<a href="https://colab.research.google.com/github/kunilovskaya/DLDH-SocSci/blob/main/zero-shot.ipynb" target="_blank">
-  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
-</a>
 
 ## Redistribution
 
