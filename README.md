@@ -30,7 +30,7 @@ referred to as "main_student_groups".
 * 23 June 2026 Session slides.
 * Example prompts and model configurations.
 
-**zero-shot.ipynb** is a Colab notebook that demonstrates how to generate automatic annotations for the Hansard data using Qwen/Qwen3-1.7B and evaluate their performance against adjudicated human annotations.
+**zero-shot.ipynb** is a Colab notebook that demonstrates how to generate automatic annotations for the Hansard data using Qwen/Qwen3-1.7B and evaluate its performance against adjudicated human annotations.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kunilovskaya/DLDH-SocSci/blob/main/zero-shot.ipynb)
 
