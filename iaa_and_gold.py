@@ -455,6 +455,8 @@ def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='lib
                 values=variable
             )
         )
+        print(matrix)
+        exit()
 
         unique_values = pd.unique(matrix.values.ravel())
         unique_values = [v for v in unique_values if pd.notna(v)]
