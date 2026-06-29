@@ -122,7 +122,6 @@ def tag_coverage_summary(df_scope, interface_df, verbose=False):
     )
 
     if verbose:
-
         seen_tags = seen_group_tags.union(seen_appeal_tags)
 
         unseen_group_tags = group_inventory - seen_group_tags
@@ -287,6 +286,7 @@ def majority_vote_list(series, threshold=2):
 
     return majority_tags, adjudicate
 
+
 # at least two annotators should return the same label
 def majority_vote(series, threshold=2):
     counts = series.value_counts(dropna=False)
@@ -330,11 +330,11 @@ def diagnose_category(df_iaa=None, prefix='EDU_'):
             print(sent_id, list(vals), "DISAGREE")
 
 
-def adjudicate_items(my_df=None, binary=None, multilabel=None, multiclass=None, meth_gold="relaxed", meth_disagree="relaxed"):
+def adjudicate_items(my_df=None, binary=None, multilabel=None, multiclass=None, meth_gold="relaxed",
+                     meth_disagree="relaxed"):
     for sent_id, group in my_df.groupby("sent_id"):
 
         gold = group.iloc[0].copy()
-
 
         gold["annotator"] = "gold"
         gold["annotation_id"] = -1
@@ -433,12 +433,12 @@ def adjudicate_items(my_df=None, binary=None, multilabel=None, multiclass=None, 
 def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='library'):
     df_iaa = my_df.copy()
 
-    # df_iaa["updated_at"] = pd.to_datetime(df_iaa["updated_at"])
-    # df_iaa = (
-    #     df_iaa.sort_values("updated_at")
-    #     .groupby(["sent_id", "annotator"], as_index=False)
-    #     .tail(1)
-    # )
+    df_iaa["updated_at"] = pd.to_datetime(df_iaa["updated_at"])
+    df_iaa = (
+        df_iaa.sort_values("updated_at")
+        .groupby(["sent_id", "annotator"], as_index=False)
+        .tail(1)
+    )
 
     # ----------------------------
     # Caregory-level IAA for binary and multiclass variables
@@ -455,8 +455,6 @@ def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='lib
                 values=variable
             )
         )
-        print(matrix)
-        exit()
 
         unique_values = pd.unique(matrix.values.ravel())
         unique_values = [v for v in unique_values if pd.notna(v)]
@@ -524,7 +522,7 @@ def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='lib
                         "variable": tag,
                         "agree_pct": np.nan,
                         "alpha": np.nan,
-                        "tag_freq": positive_count, # how many sentences have this tag
+                        "tag_freq": positive_count,  # how many sentences have this tag
                         "status": "too_rare"
                     })
                     continue
@@ -720,22 +718,25 @@ if __name__ == "__main__":
 
     # # --- INSPECT UNSEEN TAGS ---
     interface_df = pd.read_csv(args.interface, sep='\t')
+    interface_df = interface_df[~interface_df["tag"].str.contains("_*", regex=False, na=False)]
     triple_coverage = tag_coverage_summary(triple_annotated_items, interface_df, verbose=False)
 
     print("\nTag coverage in triple-annotated data")
     print(triple_coverage)
     triple_coverage.to_csv(f'{args.res}/triple_tag_coverage.csv', sep='\t', index=False)
 
-    binary_variables = ['group_mentioned', 'group_appealed', 'intersectional', 'multiple_groups', 'opposed_groups', 'pejorative']
-    # Use majority vote per tag. Exact-list majority is too strict, union too permissive. If no majority, return adjudicate=True.
+    binary_variables = ['group_mentioned', 'group_appealed', 'intersectional', 'multiple_groups', 'opposed_groups',
+                        'pejorative']
+    # Use majority vote per tag.
+    # Exact-list majority is too strict, union too permissive. If no majority, return adjudicate=True.
     multilabel_variables = ['group_tags']  # , 'appeal_tags'
     multiclass_variables = ['reasoning', 'polarity', 'stance']
 
     # --- IAA ---
     iaa_res, tag_iaa_res, cat_iaa_res = iaa_calculation(triple_annotated_items, binary=binary_variables,
-                                           multilabel=multilabel_variables,
-                                           multiclass=multiclass_variables,
-                                           min_freq=5, meth='library')
+                                                        multilabel=multilabel_variables,
+                                                        multiclass=multiclass_variables,
+                                                        min_freq=5, meth='library')
 
     # iaa_res has interface order already
     print("\nIAA (agree%, alpha) for binary and multiclass appeal categories (in interface order):")
@@ -769,8 +770,8 @@ if __name__ == "__main__":
     tag_iaa_res_valid = tag_iaa_res.dropna(subset=["alpha"]).reset_index(drop=True)
     # count rows with missing alpha
     n_dropped = tag_iaa_res["alpha"].isna().sum()
-    print("\nIAA (agree%, alpha) for per-tag multi-label social group category based on (random) triple-annotated sent_ids:")
-    print(f"\t --after dropping {n_dropped} (of {len(tag_iaa_res)}) rows with NaN alpha, {len(tag_iaa_res_valid)} rows remain:")
+    print("\nIAA (agree%, alpha): per-tag multi-label social group category based on triple-annotated sent_ids:")
+    print(f"\t --after dropping {n_dropped} (of {len(tag_iaa_res)}) rows with NaN alpha: {len(tag_iaa_res_valid)} rows")
     tag_iaa_res = tag_iaa_res.drop(['status'], axis=1)
     print(
         tag_iaa_res_valid.to_string(
@@ -848,7 +849,7 @@ if __name__ == "__main__":
     print("\nAnalysis of IAA alpha by tag frequency band:")
     print(rare_analysis)
 
-    #---- GOLD STANDARD: majority voting for triple annotated items ----
+    # ---- GOLD STANDARD: majority voting for triple annotated items ----
     # replace human-readable values with category-value codes using the scheme map
     # For binary variables, majority vote is "yes" if at least 2 annotators said "yes", otherwise "no".
     gold_rows = []
@@ -856,8 +857,8 @@ if __name__ == "__main__":
     # majority vote and add 'n_disagrements' for each sent_id out of 10 decisions
     # (6 binary variables + 1 multi-label variable + 3 multiclass variable)
     gold_df = adjudicate_items(my_df=triple_annotated_items, binary=binary_variables,
-                         multilabel=multilabel_variables, multiclass=multiclass_variables,
-                         meth_disagree="strict")
+                               multilabel=multilabel_variables, multiclass=multiclass_variables,
+                               meth_disagree="strict")
 
     # save adjudicate ids to send these items for revision
     to_adjudicate = gold_df.loc[gold_df["adjudicate"] == "yes", ["sent_id", "adjudicate", "text"]]
@@ -892,13 +893,7 @@ if __name__ == "__main__":
     bases = ['triple', "gold"]
     datas = [triple_annotated_items, gold_df]
     for base, anno_df in zip(bases, datas):
-        if base == "gold":
-            variables = base_binary_variables
-        else:
-            variables = [
-                x for x in base_binary_variables
-                if x not in {"adjudicate", "incomplete"}
-            ]
+        variables = [v for v in base_binary_variables if v in anno_df.columns]
         print(f"\n{base.upper()} ANNOTATED ITEMS")
         binary_summary = pd.DataFrame(
             [

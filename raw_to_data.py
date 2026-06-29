@@ -566,7 +566,7 @@ if __name__ == "__main__":
 
     make_dirs(logs=args.logs, make_them=[args.res, args.pics], args=args)
 
-    intab = [f for f in os.listdir(args.indir) if f.endswith("anon_raw.tsv")][0]
+    intab = [f for f in os.listdir(args.indir) if f.endswith("29June2026_anon_raw.tsv")][0]
     df = pd.read_csv(args.indir + intab, sep='\t')
     
     if RUN == "trial_student_groups":
@@ -710,6 +710,7 @@ if __name__ == "__main__":
 
     # # --- INSPECT UNSEEN TAGS ---
     interface_df = pd.read_csv(args.interface, sep='\t')
+    interface_df = interface_df[~interface_df["tag"].str.contains("_*", regex=False, na=False)]
     global_coverage = tag_coverage_summary(df, interface_df, verbose=True)
 
     print("\nTag coverage in global annotation")
