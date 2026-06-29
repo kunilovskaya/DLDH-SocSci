@@ -16,7 +16,7 @@ import argparse
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, date
 import krippendorff
 from ast import literal_eval
 import pandas as pd
@@ -339,7 +339,8 @@ def adjudicate_items(my_df=None, binary=None, multilabel=None, multiclass=None, 
 
         gold["annotator"] = "gold"
         gold["annotation_id"] = -1
-        gold["updated_at"] = pd.Timestamp.now(tz="Europe/Berlin")
+        gold["updated_at"] = date.today().isoformat()
+        # gold["updated_at"] = pd.Timestamp.now(tz="Europe/Berlin")
 
         gold["adjudicate"] = "no"  # set default value
         gold["disagreement"] = 0
@@ -675,7 +676,8 @@ def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='lib
     return iaa_df, tag_iaa_df, cat_iaa_df
 
 
-RUN = "main_student_groups"  # "main_student_groups", "trial_student_groups"
+RUN = "trial_student_groups"  # "main_student_groups", "trial_student_groups"
+my_date = "16June2026"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--intab', help="", default=f'res/{RUN}/transformed_dataset.tsv')
@@ -877,7 +879,7 @@ if __name__ == "__main__":
     print("\nDisagreement range:", gold_df_out["disagreement"].min(), "-", gold_df_out["disagreement"].max())
     print("Mean:", round(gold_df_out["disagreement"].mean(), 2))
     # gold_df_out.to_csv(f'{args.res}/gold_dataset.tsv', sep='\t', index=False)
-    gold_df_out.to_csv(f'{args.gold_to}tmp_gold_dataset.tsv', sep='\t', index=False)
+    gold_df_out.to_csv(f'{args.gold_to}{my_date}_gold_dataset.tsv', sep='\t', index=False)
 
     # --- Additional statistics --
     # statistics on binary variables: how many "yes" items per variable

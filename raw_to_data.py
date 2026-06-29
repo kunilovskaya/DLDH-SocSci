@@ -552,7 +552,8 @@ def throughput(df, available_str=None):  # return a df with columns: parameter, 
     return res_df
 
 
-RUN = "main_student_groups"  # "main_student_groups", "trial_student_groups", "marias_riss", "riss_dedicated",
+RUN = "trial_student_groups"  # "main_student_groups", "trial_student_groups"
+my_date = "16June2026"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--indir', help="", default=f'data/{RUN}/')
@@ -566,13 +567,13 @@ if __name__ == "__main__":
 
     make_dirs(logs=args.logs, make_them=[args.res, args.pics], args=args)
 
-    intab = [f for f in os.listdir(args.indir) if f.endswith("29June2026_anon_raw.tsv")][0]
+    intab = [f for f in os.listdir(args.indir) if f.endswith(f"{my_date}_anon_raw.tsv")][0]
     df = pd.read_csv(args.indir + intab, sep='\t')
     
     if RUN == "trial_student_groups":
         # other strructural and non_structural are already collapsed to "non-RISS"
         avail = '60x2+120x2'
-    else: # RUN == "main_student_groups":
+    else:  # RUN == "main_student_groups":
         # address long val in other_groups
         df["other_groups"] = df["other_groups"].replace("a social group outside RISS taxonomy", "non-RISS")
         avail = '520'
