@@ -332,6 +332,7 @@ def diagnose_category(df_iaa=None, prefix='EDU_'):
 
 def adjudicate_items(my_df=None, binary=None, multilabel=None, multiclass=None, meth_gold="relaxed",
                      meth_disagree="relaxed"):
+    gold_rows = []
     for sent_id, group in my_df.groupby("sent_id"):
 
         gold = group.iloc[0].copy()
@@ -852,7 +853,6 @@ if __name__ == "__main__":
     # ---- GOLD STANDARD: majority voting for triple annotated items ----
     # replace human-readable values with category-value codes using the scheme map
     # For binary variables, majority vote is "yes" if at least 2 annotators said "yes", otherwise "no".
-    gold_rows = []
 
     # majority vote and add 'n_disagrements' for each sent_id out of 10 decisions
     # (6 binary variables + 1 multi-label variable + 3 multiclass variable)
@@ -890,11 +890,23 @@ if __name__ == "__main__":
         'pejorative',
         'adjudicate',
     ]
+
+    failed_adjudications = (
+        gold_df
+        .groupby("sent_id")["adjudicate"]
+        .apply(lambda x: (x == "yes").any())
+        .sum()
+    )
+
     bases = ['triple', "gold"]
-    datas = [triple_annotated_items, gold_df]
+    datas = [triple_annotated_items, gold_df_out]  # len(triple) == 771, len(gold) == 257
+
     for base, anno_df in zip(bases, datas):
         variables = [v for v in base_binary_variables if v in anno_df.columns]
+
         print(f"\n{base.upper()} ANNOTATED ITEMS")
+
+        # Construct the summary table
         binary_summary = pd.DataFrame(
             [
                 {
@@ -904,25 +916,46 @@ if __name__ == "__main__":
                         .groupby("sent_id")[var]
                         .apply(lambda x: (x == "yes").any())
                         .sum()
-                    )
+                    ),
                 }
                 for var in variables
             ]
         )
-        # insert a row with base n_items
+
+        # Gold: remove adjudication row
+        if base == "gold":
+            binary_summary = binary_summary[
+                binary_summary["variable"] != "adjudicate"
+                ]
+            total_items = anno_df["sent_id"].nunique()  # anno_df["sent_id"].nunique() - failed_adjudications
+
+        else:  # triple
+            binary_summary = pd.concat(
+                [
+                    binary_summary,
+                    pd.DataFrame(
+                        [{
+                            "variable": "failed adjudication",
+                            "n_items": failed_adjudications,
+                        }]
+                    ),
+                ],
+                ignore_index=True,
+            )
+            total_items = anno_df["sent_id"].nunique()
+
+        # Prepend total row
         binary_summary = pd.concat(
             [
-                binary_summary,
                 pd.DataFrame(
-                    [
-                        {
-                            "variable": f"Total ({base})",
-                            "n_items": anno_df["sent_id"].nunique()
-                        }
-                    ]
-                )
+                    [{
+                        "variable": f"Total ({base})",
+                        "n_items": total_items,
+                    }]
+                ),
+                binary_summary,
             ],
-            ignore_index=True
+            ignore_index=True,
         )
 
         print(binary_summary)
