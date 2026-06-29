@@ -433,12 +433,12 @@ def adjudicate_items(my_df=None, binary=None, multilabel=None, multiclass=None, 
 def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='library'):
     df_iaa = my_df.copy()
 
-    df_iaa["updated_at"] = pd.to_datetime(df_iaa["updated_at"])
-    df_iaa = (
-        df_iaa.sort_values("updated_at")
-        .groupby(["sent_id", "annotator"], as_index=False)
-        .tail(1)
-    )
+    # df_iaa["updated_at"] = pd.to_datetime(df_iaa["updated_at"])
+    # df_iaa = (
+    #     df_iaa.sort_values("updated_at")
+    #     .groupby(["sent_id", "annotator"], as_index=False)
+    #     .tail(1)
+    # )
 
     # ----------------------------
     # Caregory-level IAA for binary and multiclass variables

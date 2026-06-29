@@ -2,7 +2,7 @@
 
 Materials supporting the teaching session:
 
-**Deep Learning in NLP**
+**Deep Learning in NLP (DLDH-SocSci)**
 Groups 2 and 3 (RISS annotation scheme)
 23 June 2026
 
