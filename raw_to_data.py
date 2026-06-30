@@ -28,6 +28,7 @@ import json
 import os
 import sys
 import time
+from ast import literal_eval
 
 from datetime import datetime
 
@@ -98,7 +99,6 @@ def tag_coverage_summary(df_scope, ordering_df, verbose=False):
     )
 
     if verbose:
-
         seen_tags = seen_group_tags.union(seen_appeal_tags)
 
         unseen_group_tags = group_inventory - seen_group_tags
@@ -146,17 +146,13 @@ def plot_binary_summary(binary_summary, save_as=None, show=True):
     Parameters
     ----------
     binary_summary : pd.DataFrame
-        Columns: ['variable', 'n_items']
     save_as : str | Path | None
         Path to save figure. If None, only displays.
-    title : str
-        Figure title.
-    figsize : tuple
-        Matplotlib figure size.
+    show: bool
     """
 
     plot_df = binary_summary.sort_values(
-        "n_items",
+        "sent_ids",
         ascending=False
     ).reset_index(drop=True)
 
@@ -166,19 +162,19 @@ def plot_binary_summary(binary_summary, save_as=None, show=True):
 
     sns.barplot(
         data=plot_df,
-        x="n_items",
+        x="sent_ids",
         y="variable",
         ax=ax,
     )
     title = "YES counts for binary annotation decisions"
     ax.set_title(title)
-    ax.set_xlabel("Number of items")
+    ax.set_xlabel("Number of sent_ids")
     ax.tick_params(axis="y", labelsize=14)
     ax.set_ylabel("")
 
-    for i, value in enumerate(plot_df["n_items"]):
+    for i, value in enumerate(plot_df["sent_ids"]):
         ax.text(
-            value + max(plot_df["n_items"]) * 0.01,
+            value + max(plot_df["sent_ids"]) * 0.01,
             i,
             str(value),
             va="center",
@@ -455,7 +451,6 @@ TRIAL_VALUE_TO_GROUP_TAG_NESTED = {
     },
 }
 
-
 VALUE_TO_APPEAL_TAG_NESTED = {
     "frame_flags": {
         "economic": "REASONING_ECONOMIC",
@@ -552,8 +547,8 @@ def throughput(df, available_str=None):  # return a df with columns: parameter, 
     return res_df
 
 
-RUN = "trial_student_groups"  # "main_student_groups", "trial_student_groups"
-my_date = "16June2026"
+RUN = "main_student_groups"  # "main_student_groups", "trial_student_groups"
+my_date = "29June2026"  # 16June2026
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--indir', help="", default=f'data/{RUN}/')
@@ -569,7 +564,7 @@ if __name__ == "__main__":
 
     intab = [f for f in os.listdir(args.indir) if f.endswith(f"{my_date}_anon_raw.tsv")][0]
     df = pd.read_csv(args.indir + intab, sep='\t')
-    
+
     if RUN == "trial_student_groups":
         # other strructural and non_structural are already collapsed to "non-RISS"
         avail = '60x2+120x2'
@@ -580,14 +575,14 @@ if __name__ == "__main__":
     # these are our columns of interest, we can drop the rest
     if RUN == "trial_student_groups":
         df = df[['sent_id', 'annotator', 'annotation_id', 'created_at', 'updated_at', 'lead_time',
-                           'dataset', 'year', 'date', 'left_context', 'text', 'right_context', 'further_context',
-                           'age', 'gender_sexuality', 'family', 'disability',
-                           'ethnicity', 'migration', 'religion', 'geography',
-                           'education', 'income', 'occupation',
-                           'other_groups',
-                           'frame_flags', 'polarity_flags', 'stance_flags', 'focus_flags',
-                           'group_appeal_detection', 'scheme_feedback', 'id'
-                            ]]
+                 'dataset', 'year', 'date', 'left_context', 'text', 'right_context', 'further_context',
+                 'age', 'gender_sexuality', 'family', 'disability',
+                 'ethnicity', 'migration', 'religion', 'geography',
+                 'education', 'income', 'occupation',
+                 'other_groups',
+                 'frame_flags', 'polarity_flags', 'stance_flags', 'focus_flags',
+                 'group_appeal_detection', 'scheme_feedback', 'id'
+                 ]]
     else:
         df = df[['sent_id', 'annotator', 'annotation_id', 'created_at', 'updated_at', 'lead_time',
                  'dataset', 'year', 'date', 'left_context', 'text', 'right_context', 'further_context',
@@ -605,12 +600,12 @@ if __name__ == "__main__":
     annotated_items.to_csv(f'{args.res}annotated_items.tsv', sep="\t", index=False)
 
     if RUN == "trial_student_groups":
-        group_cats = ['age', 'gender_sexuality', 'family',  'disability',
+        group_cats = ['age', 'gender_sexuality', 'family', 'disability',
                       'ethnicity', 'migration', 'religion', 'geography',
                       'education', 'income', 'occupation',
                       'other_groups']
     else:
-        group_cats = ['age', 'gender_sexuality', 'family',  'disability',
+        group_cats = ['age', 'gender_sexuality', 'family', 'disability',
                       'ethnicity', 'migration', 'citizenship', 'religion', 'geography',
                       'education', 'income', 'occupation',
                       'other_groups']
@@ -618,22 +613,15 @@ if __name__ == "__main__":
     # disentangle flags in group_appeal_detection into binary columns: group_mentioned and group_appealed
     print("\nConverting group_appeal_detection flags into binary columns...")
     print(df["group_appeal_detection"].value_counts(dropna=False))
+    # set defaults
     df["group_mentioned"] = "yes"
     df["group_appealed"] = "yes"
 
-    df.loc[
-        df["group_appeal_detection"] == "no group mentioned",
-        ["group_mentioned", "group_appealed"]
-    ] = ["no", "no"]
+    # update defaults given the actual annotations
+    # logically if no group is mentioned, it cannot be appealed <<-- do this later, for all columns
+    df.loc[df["group_appeal_detection"] == "no group mentioned", ["group_mentioned", "group_appealed"]] = ["no", "no"]
 
-    df.loc[
-        df["group_appeal_detection"] == "no group appealed",
-        "group_appealed"
-    ] = "no"
-
-    # print(df[['sent_id', 'group_appeal_detection', 'group_mentioned', 'group_appealed', 'stance_flags']])
-    # print(df[df['sent_id'] == 'lords_2025_33002:002'])
-    # print(df.shape)
+    df.loc[df["group_appeal_detection"] == "no group appealed", "group_appealed"] = "no"
 
     # disentangle flags in focus_flags column into separate columns with binary values
     FLAGS = {
@@ -657,12 +645,12 @@ if __name__ == "__main__":
         # Single flag as string
         return [value]
 
+
     for flag, col in FLAGS.items():
         df[col] = df["focus_flags"].apply(
             lambda x: "yes" if flag in extract_flags(x) else "no"
         )
     cols = ["focus_flags"] + list(FLAGS.values())
-    # print(df.loc[df["focus_flags"].notna(), cols].head())
 
     if RUN == "trial_student_groups":
         df = df.replace(TRIAL_VALUE_TO_GROUP_TAG_NESTED)
@@ -673,28 +661,33 @@ if __name__ == "__main__":
     # aggregate values in multi-label group tags into new columns 'group_tags'
     df['group_tags'] = df[group_cats].values.tolist()
     # remove nan values from the lists in 'group_tags': [nan, nan, FAM_FAM, nan, nan, nan, nan ...] -> [FAM_FAM]
+    # get [] for all-nan, changing it to ["NA"] later, for consistency with other columns
     df["group_tags"] = df[group_cats].apply(lambda row: [x for x in row if pd.notna(x)], axis=1)
-    # print(df["group_tags"].head())
 
     # SANITY CHECK 1: verify or add value in intersectional column, use "yes" if len() in group_tags > 1, otherwise "no"
     df["intersectional"] = df.apply(lambda row: "yes" if len(row["group_tags"]) > 1 else "no", axis=1)
 
-    # df['appeal_tags'] = df[['frame_flags', 'polarity_flags', 'stance_flags']].values.tolist()
-    # df["appeal_tags"] = df["appeal_tags"].apply(lambda lst: [] if all(pd.isna(x) for x in lst) else lst)
-    # df["appeal_tags"] = df[['frame_flags', 'polarity_flags', 'stance_flags']].apply(lambda row: [x for x in row if pd.notna(x)], axis=1)
-
-    # SANITY CHECK 2: if there are any nans in appeal_tags lists and group_appeal_detection is "yes", put "yes" in incomplete column, else "no"
     df = df.rename(columns={'frame_flags': 'reasoning', 'polarity_flags': 'polarity', 'stance_flags': 'stance'})
     appeal_cols = ["reasoning", "polarity", "stance"]
+    # SANITY CHECK 2:
+    # if there are any nans in appeal_tags and group_appeal_detection is "yes", put incomplet=="yes", else "no"
+    df["incomplete"] = df.apply(
+        lambda row: (
+            "yes"
+            if (
+                    row["group_appealed"] == "yes"
+                    and (
+                            row[appeal_cols].isna().any()
+                            or row["group_tags"] == []
+                    )
+            )
+            else "no"
+        ),
+        axis=1,
+    )
 
-    df["incomplete"] = df.apply(lambda row: ("yes" if row["group_appealed"] == "yes" and
-                                                      row[appeal_cols].isna().any() else "no"), axis=1)
-
-    df["incomplete"] = df.apply(lambda row: ("yes" if row["group_appealed"] == "yes" and
-                                                      len(row["group_tags"]) == 0 else "no"), axis=1)
-
-    # keep only the columns you want in the gold dataset, i.e. drop original columns, now transformed and technical columns:
-    # e.g. group_appeal_detection, frame_flags, polarity_flags, stance_flags, focus_flags, 'dataset', 'scheme_feedback', 'lead_time', etc
+    # keep only the columns you want in the gold dataset, i.e. drop original and technical columns:
+    # e.g. group_appeal_detection, frame_flags, polarity_flags, stance_flags, focus_flags, 'scheme_feedback', etc
     df = df[['annotation_id', 'annotator', 'sent_id', 'updated_at',
              'group_mentioned', 'group_appealed', 'intersectional', 'multiple_groups', 'opposed_groups', 'pejorative',
              'group_tags',
@@ -702,12 +695,30 @@ if __name__ == "__main__":
              'incomplete',
              'text', 'left_context', 'right_context', 'further_context', 'year', 'date', 'dataset'
              ]]
+    # because the scheme is hierarchical, many variable become binary only after group mention is detected
+    # i.e. in the full dataset, they should include NA, e.g. group_appeal_detection is non-binary: yes, no, NA
+    # for IAA, for subsequent categories we need to drop items where Annotators disagree on group mention
 
-    print(f"\nTransformed dataset (for IAA and adjudication) with {len(df)} rows and {len(df.columns)} columns:")
-    print(df.head(3))
-    print(df.columns.tolist())
+    # replace values in all columns with "NA" where group_mentioned is "no"
+    cols_to_na1 = ['group_appealed', 'intersectional', 'multiple_groups', 'opposed_groups', 'pejorative',
+                   'reasoning', 'polarity', 'stance']
+    df.loc[df["group_mentioned"] == "no", cols_to_na1] = "NA"
+    cols_to_na2 = [c for c in cols_to_na1 if c != "group_appealed"]
 
-    df.to_csv(f'{args.res}transformed_dataset.tsv', sep="\t", index=False)
+    df.loc[df["group_appealed"] == "no", cols_to_na2] = "NA"
+
+    mask1 = df["group_mentioned"] == "no"
+    df.loc[mask1, "group_tags"] = (df.loc[mask1, "group_tags"].apply(lambda _: ["NA"]))
+    df = df.copy()
+    mask2 = df["group_appealed"] == "no"
+    df.loc[mask2, "group_tags"] = (df.loc[mask2, "group_tags"].apply(lambda _: ["NA"]))
+
+    print(f"\nTransformed dataset (for filtering, IAA and adjudication): {df.shape}")
+    df = df.sort_values("sent_id").reset_index(drop=True)
+
+    print(df[["annotator", "sent_id", "group_mentioned", "group_appealed", "group_tags", "reasoning", "stance"]].head())
+
+    df.to_csv(f'{args.res}{my_date}_transformed_dataset.tsv', sep="\t", index=False)
 
     # # --- INSPECT UNSEEN TAGS ---
     interface_df = pd.read_csv(args.interface, sep='\t')
@@ -736,7 +747,7 @@ if __name__ == "__main__":
         [
             {
                 "variable": var,
-                "n_items": (
+                "sent_ids": (
                     df
                     .groupby("sent_id")[var]
                     .apply(lambda x: (x == "yes").any())
@@ -754,7 +765,7 @@ if __name__ == "__main__":
                 [
                     {
                         "variable": f"Total ({base})",
-                        "n_items": df["sent_id"].nunique()
+                        "sent_ids": df["sent_id"].nunique()
                     }
                 ]
             )
@@ -763,9 +774,9 @@ if __name__ == "__main__":
     )
 
     print(binary_summary)
-    binary_summary.to_csv(f'{args.res}/binary_yes_counts_{base}.tsv', sep='\t', index=False)
+    binary_summary.to_csv(f'{args.res}/yes_counts_{base}.tsv', sep='\t', index=False)
 
-    plot_binary_summary(binary_summary, save_as=f"{args.pics}/binary_yes_counts_{base}.png")
+    plot_binary_summary(binary_summary, save_as=f"{args.pics}/yes_counts_{base}.png")
 
     end = time.time()
     elapsed_time = (end - start) / 60

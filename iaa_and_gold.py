@@ -265,6 +265,7 @@ PREFIX_TO_CATEGORY = {
     "EDU": "education",
     "INC": "income",
     "OCC": "occupation",
+    "OTH": "non-RISS",
     "REASONING": "reasoning",
     "POLARITY": "polarity",
     "STANCE": "stance"
@@ -432,7 +433,7 @@ def adjudicate_items(my_df=None, binary=None, multilabel=None, multiclass=None, 
     return _gold_df
 
 
-def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='library'):
+def iaa_binary_multiclass(my_df, my_vars):
     df_iaa = my_df.copy()
 
     df_iaa["updated_at"] = pd.to_datetime(df_iaa["updated_at"])
@@ -441,14 +442,14 @@ def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='lib
         .groupby(["sent_id", "annotator"], as_index=False)
         .tail(1)
     )
-
     # ----------------------------
     # Caregory-level IAA for binary and multiclass variables
     # ----------------------------
     results = []
-    my_must_have_cats = binary + multiclass
 
-    for variable in my_must_have_cats:
+    for variable in my_vars:
+        n_values = df_iaa[variable].nunique(dropna=True)
+        n_items = df_iaa["sent_id"].nunique()
         matrix = (
             df_iaa
             .pivot(
@@ -488,154 +489,171 @@ def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='lib
             status = "undefined" if np.isnan(alpha) else "ok"
 
         results.append({
-            "variable_type": "binary" if variable in binary else "multiclass",
+            "variable_type": "binary" if n_values == 2 else "multiclass",
             "variable": variable,
             "agree_pct": round(agreement_pct, 2),
             "alpha": round(alpha, 3) if pd.notna(alpha) else np.nan,
-            "status": status,
+            "n_items": n_items,
+            "n_values": n_values,
+            # "status": status,
         })
+
     iaa_df = pd.DataFrame(results)
+
+    return iaa_df
+
+
+def iaa_multilabel_tags(my_df, multilabel, ordering_df, min_freq=2):
+    df_iaa = my_df.copy()
     # ----------------------------
     # multilabel variables (tag-wise, treating each tag as binary choice)
-    # ----------------------------
     # How often do annotators agree on the presence of each group tag, regardless of other tags?
-    tag_iaa_df = pd.DataFrame()  # empty df
-    if multilabel:  # for LLM prompting, we might want to skip this step for now
-        tag_results = []
-        for variable in multilabel:  # ["group_tags"]
-            all_tags = sorted(
-                set(
-                    tag
-                    for tags in df_iaa[variable].dropna()
-                    for tag in tags
-                )
-            )
-
-            for tag in all_tags:
-                # exclude infrequent tag in the triple-annotated dataset (e.g., only one occurrence)
-                positive_count = sum(
-                    tag in tags
-                    for tags in df_iaa[variable]
-                )
-
-                if positive_count < min_freq:
-                    tag_results.append({
-                        "variable_type": "multilabel",
-                        "variable": tag,
-                        "agree_pct": np.nan,
-                        "alpha": np.nan,
-                        "tag_freq": positive_count,  # how many sentences have this tag
-                        "status": "too_rare"
-                    })
-                    continue
-                tmp = df_iaa.copy()
-
-                tmp[f"tag_{tag}"] = tmp[variable].apply(
-                    lambda tags:
-                    "yes"
-                    if isinstance(tags, list) and tag in tags
-                    else "no"
-                )
-
-                matrix = (
-                    tmp
-                    .pivot(
-                        index="annotator",
-                        columns="sent_id",
-                        values=f"tag_{tag}"
-                    )
-                    .apply(lambda col: col.map({"yes": 1, "no": 0}))
-                )
-
-                unique_values = pd.unique(matrix.values.ravel())
-                unique_values = [v for v in unique_values if pd.notna(v)]
-
-                alpha = np.nan
-                if len(unique_values) <= 1:
-                    status = "single_value"
-                else:
-                    alpha = krippendorff.alpha(
-                        reliability_data=matrix.values,
-                        level_of_measurement="nominal"
-                    )
-                    status = "ok"
-
-                agreement_pct, n_agree, n_usable = percentage_agreement(matrix.values)
-
-                tag_results.append({
-                    "variable_type": "multilabel",
-                    "variable": tag,
-                    "agree_pct": round(agreement_pct, 2),
-                    "alpha": round(alpha, 3),
-                    "n_items": matrix.shape[1],
-                    "tag_freq": positive_count,
-                    "status": status
-                })
-
-        tag_iaa_df = pd.DataFrame(tag_results)
-
     # ----------------------------
-    # Multilabel variable (category-wise)
-    # ----------------------------
-    cat_results = []
-    category_prefixes = [
-        "AGE_",
-        "GEN_",
-        "FAM_",
-        "DIS_",
-        "ETH_",
-        "MIG_",
-        # "CIT_",
-        "REL_",
-        "GEO_",
-        "EDU_",
-        "INC_",
-        "OCC_",
-    ]
 
-    # diagnose_category(df_iaa=df_iaa, prefix='ETH_')
-    # exit()
+    n_items = df_iaa["sent_id"].nunique()
+    tag_results = []
+    all_tags = sorted(
+        set(
+            tag
+            for tags in df_iaa[multilabel].dropna()
+            for tag in tags
+        )
+    )
 
-    for prefix in category_prefixes:
-
-        tmp = df_iaa.copy()
-
-        tmp["category_value"] = tmp["group_tags"].apply(
-            lambda tags: next(
-                (tag for tag in tags if tag.startswith(prefix)),
-                np.nan
-            )
+    for tag in all_tags:
+        # exclude infrequent tag in the triple-annotated dataset (e.g., only one occurrence)
+        positive_count = sum(
+            tag in tags
+            for tags in df_iaa[multilabel]
         )
 
-        # matrix: annotators x sentences, values: category_value
+        if positive_count < min_freq:
+            tag_results.append({
+                "variable_type": "multilabel",
+                "variable": tag,
+                "agree_pct": np.nan,
+                "alpha": np.nan,
+                "tag_freq": int(positive_count),  # how many sentences have this tag
+                "status": "too_rare"
+            })
+            continue
+        tmp = df_iaa.copy()
+
+        tmp[f"tag_{tag}"] = tmp[multilabel].apply(
+            lambda tags:
+            "yes"
+            if isinstance(tags, list) and tag in tags
+            else "no"
+        )
+
         matrix = (
             tmp
             .pivot(
                 index="annotator",
                 columns="sent_id",
-                values="category_value"
+                values=f"tag_{tag}"
             )
+            .apply(lambda col: col.map({"yes": 1, "no": 0}))
         )
 
         unique_values = pd.unique(matrix.values.ravel())
         unique_values = [v for v in unique_values if pd.notna(v)]
 
-        n_usable_items = (
-            matrix.notna()
-            .sum(axis=0)
-            .ge(2)
-            .sum()
+        alpha = np.nan
+        if len(unique_values) <= 1:
+            status = "single_value"
+        else:
+            alpha = krippendorff.alpha(
+                reliability_data=matrix.values,
+                level_of_measurement="nominal"
+            )
+            status = "ok"
+
+        agreement_pct, n_agree, n_usable = percentage_agreement(matrix.values)
+
+        tag_results.append({
+            "variable_type": "multilabel",
+            "variable": tag,
+            "agree_pct": agreement_pct,
+            "alpha": alpha,
+            "n_items": n_items,
+            "n_values": 2,
+            "tag_freq": positive_count,
+            "status": status
+        })
+
+
+    tag_iaa_df = pd.DataFrame(tag_results)
+
+    tag_iaa_df = tag_iaa_df.merge(
+        ordering_df,
+        left_on="variable",
+        right_on="tag",
+        how="left",
+        indicator=True,
+    )
+
+    tag_iaa_df["variable"] = tag_iaa_df["group"]
+
+    tag_iaa_df["variable"] = tag_iaa_df["group"]  # this group comes from interface choices
+    # Which tags did not match the ordering table?
+
+    tag_iaa_df = (
+        tag_iaa_df
+        .sort_values(["category_order", "group_order"])
+        .drop(columns=["tag"])
+        .reset_index(drop=True)
+    )
+
+    tag_iaa_df = tag_iaa_df[["variable_type", "category", "variable",
+                             "agree_pct", "alpha", "tag_freq",
+                             "n_items", "n_values", "status"]]
+    tag_iaa_df["tag_freq"] = tag_iaa_df["tag_freq"].astype("Int64")  # keeps missing values as <NA> not NaN
+
+    return tag_iaa_df
+
+
+def iaa_multilabel_categories(my_df, multilabel, cat_pref=None, meth="library"):
+    df_iaa = my_df.copy()
+    # debugging duplicate annotators: in team
+    # dups = df_iaa[df_iaa.duplicated(["annotator", "sent_id"], keep=False)]
+    # print(dups[["sent_id", "annotator"]])
+    # print(dups.sort_values(["sent_id", "annotator"]))
+    # exit()
+    # ----------------------------
+    # Multilabel variable (category-wise)
+    # ----------------------------
+    cat_results = []
+
+    # diagnose_category(df_iaa=df_iaa, prefix='ETH_')
+    # exit()
+
+    for prefix in cat_pref:
+
+        tmp = df_iaa.copy()
+
+        tmp["category_present"] = tmp[multilabel].apply(
+            lambda tags: "yes" if any(tag.startswith(prefix) for tag in tags) else "no"
         )
+
+        matrix = tmp.pivot(
+            index="annotator",
+            columns="sent_id",
+            values="category_present",
+        )
+
+        matrix = matrix.eq("yes").astype(int)
+
+        unique_values = pd.unique(matrix.values.ravel())
+        unique_values = [v for v in unique_values if pd.notna(v)]
+
+        n_usable_items = (matrix.notna().sum(axis=0).ge(2).sum())
 
         usable_cols = matrix.columns[matrix.notna().sum(axis=0) >= 2]
 
         usable_matrix = matrix[usable_cols]
 
-        value_counts = (
-            pd.Series(usable_matrix.values.ravel())
-            .dropna()
-            .value_counts()
-        )
+        value_counts = (pd.Series(usable_matrix.values.ravel()).dropna().value_counts())
         usable_values = value_counts[value_counts >= 2]
 
         alpha = np.nan
@@ -665,22 +683,126 @@ def iaa_calculation(my_df, binary, multilabel, multiclass, min_freq=2, meth='lib
         cat_results.append({
             "variable_type": "multilabel",
             "category": PREFIX_TO_CATEGORY[prefix[:-1]],
-            "agree_pct": round(agreement_pct, 2),
-            "alpha": round(alpha, 3),
-            "n_usable_items": n_usable_items,
-            "n_usable_values": len(value_counts),
-            "status": status,
+            "agree_pct": agreement_pct,
+            "alpha": alpha,
+            "n_items": n_usable_items,
+            "n_values": len(value_counts),
+            # "status": status,
         })
     cat_iaa_df = pd.DataFrame(cat_results)
 
-    return iaa_df, tag_iaa_df, cat_iaa_df
+    return cat_iaa_df
 
 
-RUN = "trial_student_groups"  # "main_student_groups", "trial_student_groups"
-my_date = "16June2026"
+def one_row_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res, cross_annotated):
+    collector = [{
+        # ("", "# triple"): cross_annotated["sent_id"].nunique(),
+        ("Binary", "Agree %"): iaa_res_bin["agree_pct"].mean(),
+        ("Binary", "Alpha"): iaa_res_bin["alpha"].mean(),
+        # ("", "# triple"): cross_annotated2["sent_id"].nunique(),
+
+        ("Multiclass", "Agree %"): iaa_res_multi["agree_pct"].mean(),
+        ("Multiclass", "Alpha"): iaa_res_multi["alpha"].mean(),
+
+        ("Multilabel", "Agree %"): cat_iaa_res["agree_pct"].mean(),
+        ("Multilabel", "Alpha"): cat_iaa_res["alpha"].mean(),
+        ("Overall", "Agree %"): pd.concat([
+            iaa_res_bin["agree_pct"],
+            iaa_res_multi["agree_pct"],
+            cat_iaa_res["agree_pct"],
+        ]).mean(),
+        ("Overall", "Alpha"): pd.concat([
+            iaa_res_bin["alpha"],
+            iaa_res_multi["alpha"],
+            cat_iaa_res["alpha"],
+        ]).mean(),
+    }]
+
+    summary_df = (
+        pd.DataFrame.from_records(collector)
+        .round({
+            ("Binary", "Agree %"): 2,
+            ("Binary", "Alpha"): 3,
+            ("Multilabel", "Agree %"): 2,
+            ("Multilabel", "Alpha"): 3,
+            ("Multiclass", "Agree %"): 2,
+            ("Multiclass", "Alpha"): 3,
+            ("Overall", "Agree %"): 2,
+            ("Overall", "Alpha"): 3,
+        })
+    )
+
+    return summary_df
+
+
+def detailed_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res):
+    rows = []
+
+    # Binary
+    rows.append(iaa_res_bin)
+    rows.append(pd.DataFrame([{
+        "variable_type": "Average",
+        "variable": "",
+        "agree_pct": iaa_res_bin["agree_pct"].mean(),
+        "alpha": iaa_res_bin["alpha"].mean(),
+        "n_items": "--",
+        "n_values": "--",
+    }]))
+
+    # Multiclass
+    rows.append(iaa_res_multi)
+    rows.append(pd.DataFrame([{
+        "variable_type": "Average",
+        "variable": "",
+        "agree_pct": iaa_res_multi["agree_pct"].mean(),
+        "alpha": iaa_res_multi["alpha"].mean(),
+        "n_items": "--",
+        "n_values": "--",
+    }]))
+
+    # Multilabel
+    rows.append(cat_iaa_res.rename(columns={"category": "variable"}))
+    rows.append(pd.DataFrame([{
+        "variable_type": "Average",
+        "variable": "",
+        "agree_pct": cat_iaa_res["agree_pct"].mean(),
+        "alpha": cat_iaa_res["alpha"].mean(),
+        "n_items": "--",
+        "n_values": "--",
+    }]))
+
+    summary_df = pd.concat(rows, ignore_index=True)
+
+    summary_df = pd.concat([
+        summary_df,
+        pd.DataFrame([{
+            "variable_type": "Overall",
+            "variable": "",
+            "agree_pct": pd.concat([
+                iaa_res_bin["agree_pct"],
+                iaa_res_multi["agree_pct"],
+                cat_iaa_res["agree_pct"],
+            ]).mean(),
+            "alpha": pd.concat([
+                iaa_res_bin["alpha"],
+                iaa_res_multi["alpha"],
+                cat_iaa_res["alpha"],
+            ]).mean(),
+            "n_items": "--",
+            "n_values": "--",
+        }])
+    ], ignore_index=True)
+
+    summary_df = summary_df.round({"agree_pct": 2, "alpha": 3})
+
+    return summary_df
+
+
+RUN = "main_student_groups"  # "main_student_groups", "trial_student_groups"
+my_date = "29June2026"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--intab', help="", default=f'res/{RUN}/transformed_dataset.tsv')
+    parser.add_argument('--intab', help="", default=f'res/{RUN}/{my_date}_transformed_dataset.tsv')
     parser.add_argument('--interface', help="", default=f'interface/{RUN}/interface_scheme.tsv')
     parser.add_argument('--gold_to', default=f'data/{RUN}/')
     parser.add_argument('--res', default=f'res/{RUN}/iaa/')
@@ -692,27 +814,43 @@ if __name__ == "__main__":
     start = time.time()
 
     make_dirs(logs=args.logs, make_them=[args.res, args.pics, args.gold_to, args.reworks], args=args)
+
     df = pd.read_csv(args.intab, sep='\t')
-    df["group_tags"] = df["group_tags"].apply(lambda x: literal_eval(x) if pd.notna(x) else [])
+    # pandas might read our "NA" as NaN
+    df["group_tags"] = df["group_tags"].apply(lambda x: literal_eval(x) if x else ["NA"])
+    df = df.fillna("NA")
 
-    to_rework = df.loc[df["incomplete"] == "yes", ["sent_id", "incomplete", "text"]]
+    print(df[["annotator", "sent_id", "group_mentioned", "group_appealed", "group_tags", "reasoning", "stance"]].head())
 
-    to_rework.to_csv(args.reworks + "faulty_incomplete_sent_ids.tsv", index=False, sep='\t')
+    to_rework = df.loc[df["incomplete"] == "yes", ["annotator", "sent_id", "left_context", "text", "right_context",
+                                                   "further_context", "date", "dataset", "year"]]
+    to_rework.to_csv(args.reworks + "faulty_incomplete_annotations.tsv", index=False, sep='\t')
+
     # drop them for the IAA analysis and gold generation
     df = df[df["incomplete"] != "yes"]
 
     # export sent_ids for multiple groups tagged:
-    multi_group = df.loc[df["multiple_groups"].apply(lambda tags: len(tags) > 1), "sent_id"]
+    multi_group = (
+        df[df["multiple_groups"] == "yes"]
+        [["sent_id", "left_context", "text", "right_context",
+          "further_context", "date", "dataset", "year"]]
+        .drop_duplicates("sent_id")
+    )
+    print("How many annotations indicated multiple groups?")
+    print(df["multiple_groups"].value_counts(dropna=False))
+    print('How many sent_ids have multiple groups tagged at least once?')
+    print(len(multi_group))
+
     multi_group.to_csv(args.reworks + "multi_group_sent_ids.tsv", index=False)
 
     # ---- Subsetting data for IAA and adjudication ----
     triple_or_more_annotated_items = df.groupby("sent_id").filter(lambda x: x["annotation_id"].nunique() >= 3)
 
-    print(f"\nTotal sentences: {len(df)}")
+    print(f"\nTotal annotations: {len(df)}")
     print(f"Sentences with 3+ annotations: {len(triple_or_more_annotated_items['sent_id'].unique())}")
     print(f"\t--- after removing {len(to_rework)} incomplete/faulty annotations ---")
     # from each set of annotations take random three
-    triple_annotated_items = (
+    cross_annotated = (
         triple_or_more_annotated_items
         .groupby("sent_id", group_keys=False)
         .sample(n=3, random_state=42)
@@ -722,73 +860,80 @@ if __name__ == "__main__":
     # # --- INSPECT UNSEEN TAGS ---
     interface_df = pd.read_csv(args.interface, sep='\t')
     interface_df = interface_df[~interface_df["tag"].str.contains("_*", regex=False, na=False)]
-    triple_coverage = tag_coverage_summary(triple_annotated_items, interface_df, verbose=False)
+    triple_coverage = tag_coverage_summary(cross_annotated, interface_df, verbose=False)
 
     print("\nTag coverage in triple-annotated data")
     print(triple_coverage)
     triple_coverage.to_csv(f'{args.res}/triple_tag_coverage.csv', sep='\t', index=False)
 
-    binary_variables = ['group_mentioned', 'group_appealed', 'intersectional', 'multiple_groups', 'opposed_groups',
-                        'pejorative']
-    # Use majority vote per tag.
-    # Exact-list majority is too strict, union too permissive. If no majority, return adjudicate=True.
-    multilabel_variables = ['group_tags']  # , 'appeal_tags'
-    multiclass_variables = ['reasoning', 'polarity', 'stance']
+    # define types of variables for IAA and gold standard generation
 
-    # --- IAA ---
-    iaa_res, tag_iaa_res, cat_iaa_res = iaa_calculation(triple_annotated_items, binary=binary_variables,
-                                                        multilabel=multilabel_variables,
-                                                        multiclass=multiclass_variables,
-                                                        min_freq=5, meth='library')
+    class_vars = ['intersectional', 'multiple_groups', 'opposed_groups', 'pejorative',
+                  'reasoning', 'polarity', 'stance']
 
-    # iaa_res has interface order already
-    print("\nIAA (agree%, alpha) for binary and multiclass appeal categories (in interface order):")
-    iaa_res = iaa_res.drop(['status'], axis=1)
-    print(iaa_res)
-    iaa_res.to_csv(os.path.join(args.res, "iaa_results_binary+multi-class_category-level.tsv"), sep='\t', index=False)
+    # ======= IAA ========
+    # calculate IAA true global binary: group_mentioned
+    iaa_res_mention = iaa_binary_multiclass(cross_annotated, ["group_mentioned"])
 
-    # restoring the interface order in per-tag results, inc. binary categories
-    tag_iaa_res = tag_iaa_res.merge(
-        interface_df,
-        left_on="variable",
-        right_on="tag",
-        how="left"
-    )
+    # calculate IAA where group_mentioned == "yes" in all annotations
+    cross_annotated1 = cross_annotated.groupby("sent_id").filter(lambda x: (x["group_mentioned"] == "yes").all())
+    iaa_res_appealed = iaa_binary_multiclass(cross_annotated1, ["group_appealed"])
 
-    tag_iaa_res["variable"] = tag_iaa_res["group"]
+    # keep sent_ids where group_appealed == "yes" in all annotations
+    cross_annotated2 = cross_annotated1.groupby("sent_id").filter(lambda x: (x["group_appealed"] == "yes").all())
+    iaa_res_multi = iaa_binary_multiclass(cross_annotated2, class_vars)
 
-    tag_iaa_res = (
-        tag_iaa_res
-        .sort_values(["category_order", "group_order"])
-        .drop(columns=["tag"])
-        .reset_index(drop=True)
-    )
+    if RUN == "trial_student_groups":
+        cat_prefixes = ["AGE_", "GEN_", "FAM_", "DIS_", "ETH_", "MIG_", "REL_", "GEO_", "EDU_", "INC_", "OCC_", "OTH_"]
+    else:
+        cat_prefixes = ["AGE_", "GEN_", "FAM_", "DIS_", "ETH_", "MIG_", "CIT_",
+                        "REL_", "GEO_", "EDU_", "INC_", "OCC_", "OTH_"]
 
-    tag_iaa_res = tag_iaa_res[["variable_type", "category", "variable", "agree_pct", "alpha", "tag_freq", "status"]]
-    tag_iaa_res["tag_freq"] = tag_iaa_res["tag_freq"].astype("Int64")  # keeps missing values as <NA> not NaN
-    tag_iaa_res["alpha"] = tag_iaa_res["alpha"].round(3)
-    tag_iaa_res.to_csv(os.path.join(args.res, "iaa_results_tag-level_social-groups_all.tsv"), sep='\t', index=False)
+    cat_iaa_res = iaa_multilabel_categories(cross_annotated2, "group_tags", cat_pref=cat_prefixes, meth="library")
 
-    # keep only rows with valid alpha
+    iaa_res_bin = pd.concat([iaa_res_mention, iaa_res_appealed], ignore_index=True)
+    mini_res = one_row_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res, cross_annotated)
+    print(mini_res.to_string(index=False))
+
+    print("\nDetailed IAA results:")
+    detailed = detailed_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res)
+    print(detailed)
+    detailed.to_csv(f'{args.res}iaa_summary.tsv', sep='\t', index=False)
+    print(f"IAA summary saved to {args.res}iaa_summary.tsv\n")
+
+    # separately look at IAA per-tag in group-tags
+    tag_iaa_res = iaa_multilabel_tags(cross_annotated2, "group_tags", interface_df, min_freq=5)
+
+    # for per-tag view: keep only rows with valid alpha
     tag_iaa_res_valid = tag_iaa_res.dropna(subset=["alpha"]).reset_index(drop=True)
     # count rows with missing alpha
     n_dropped = tag_iaa_res["alpha"].isna().sum()
-    print("\nIAA (agree%, alpha): per-tag multi-label social group category based on triple-annotated sent_ids:")
-    print(f"\t --after dropping {n_dropped} (of {len(tag_iaa_res)}) rows with NaN alpha: {len(tag_iaa_res_valid)} rows")
-    tag_iaa_res = tag_iaa_res.drop(['status'], axis=1)
-    print(
-        tag_iaa_res_valid.to_string(
-            index=False,
-            formatters={"alpha": "{:.3f}".format}
-        )
-    )
+    print(f"\nPer-tag IAA is not defined for {n_dropped} (of {len(tag_iaa_res)})")
+    tag_iaa_res_valid = tag_iaa_res_valid.drop(["status"], axis=1)
+    # aggregate: add Avg row and round as before
+    avg_row = pd.DataFrame({
+        "variable_type": ["Average"],
+        "category": [""],
+        "variable": [""],
+        "agree_pct": [tag_iaa_res_valid["agree_pct"].mean().round(2)],
+        "alpha": [tag_iaa_res_valid["alpha"].mean().round(3)],
+        "tag_freq": [tag_iaa_res_valid["tag_freq"].mean().round(1)],
+        "n_items": ["--"],
+        "n_values": ["--"],
+    })
 
-    tag_iaa_res_valid.to_csv(f'{args.res}/iaa_results_tag-level_social-groups_all_valid.tsv', sep='\t', index=False)
+    tag_valid_out = pd.concat([tag_iaa_res_valid, avg_row], ignore_index=True)
+    # tag_valid_out = tag_valid_out.astype({"n_items": "Int64", "n_values": "Int64"})
+    print(f"\nPer-tag IAA results (valid alpha) for {len(tag_iaa_res_valid)} tags:")
+    print(tag_valid_out.to_string(index=False))
 
-    # cat_iaa_res has interface order already
-    print("\nIAA (agree%, alpha) for each social group category (category-level, in interface order):")
-    print(cat_iaa_res)
-    cat_iaa_res.to_csv(os.path.join(args.res, "iaa_results_multi-label_category-level.tsv"), sep='\t', index=False)
+    tag_valid_out.to_csv(os.path.join(args.res, "iaa_results_tag-level_social-groups_valid.tsv"),
+                         sep='\t', index=False)
+
+    tag_iaa_res["alpha"] = tag_iaa_res["alpha"].round(3)
+    tag_iaa_res["agree_pct"] = tag_iaa_res["agree_pct"].round(2)
+    tag_iaa_res.to_csv(os.path.join(args.res, "iaa_results_tag-level_social-groups_all.tsv"), sep='\t', index=False)
+    print(f"IAA full results per tag + status are saved separately.\n")
 
     # --- RARE BUT SEEN TAGS: < 5 freq tags are skipped for IAA (alpha = NaN) ---
     low_freq_report = (
@@ -857,9 +1002,13 @@ if __name__ == "__main__":
     # For binary variables, majority vote is "yes" if at least 2 annotators said "yes", otherwise "no".
 
     # majority vote and add 'n_disagrements' for each sent_id out of 10 decisions
-    # (6 binary variables + 1 multi-label variable + 3 multiclass variable)
-    gold_df = adjudicate_items(my_df=triple_annotated_items, binary=binary_variables,
-                               multilabel=multilabel_variables, multiclass=multiclass_variables,
+    # (1 binary variable + 1 multi-label variable + 11 multiclass variable)
+    print(cross_annotated["group_appealed"].unique())  # ['no' 'NA' 'yes']
+
+    multiclass_vars = ['group_appealed', 'intersectional', 'multiple_groups', 'opposed_groups', 'pejorative',
+                       'reasoning', 'polarity', 'stance', 'reasoning', 'polarity', 'stance']
+    gold_df = adjudicate_items(my_df=cross_annotated, binary=["group_mentioned"],
+                               multilabel=["group_tags"], multiclass=multiclass_vars,
                                meth_disagree="strict")
 
     # save adjudicate ids to send these items for revision
@@ -901,7 +1050,7 @@ if __name__ == "__main__":
     )
 
     bases = ['triple', "gold"]
-    datas = [triple_annotated_items, gold_df_out]  # len(triple) == 771, len(gold) == 257
+    datas = [cross_annotated, gold_df_out]  # len(triple) == 771, len(gold) == 257
 
     for base, anno_df in zip(bases, datas):
         variables = [v for v in base_binary_variables if v in anno_df.columns]
@@ -961,9 +1110,8 @@ if __name__ == "__main__":
         )
 
         print(binary_summary)
-        binary_summary.to_csv(f'{args.res}/binary_yes_counts_{base}.tsv', sep='\t', index=False)
-
-        plot_binary_summary(binary_summary, save_as=f"{args.pics}/binary_yes_counts_{base}.png", show=True)
+        binary_summary.to_csv(f'{args.res}/yes_counts_{base}.tsv', sep='\t', index=False)
+        plot_binary_summary(binary_summary, save_as=f"{args.pics}/yes_counts_{base}.png", show=True)
 
     # The JSON is much richer than the TSV.
     end = time.time()
