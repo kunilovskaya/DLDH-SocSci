@@ -221,13 +221,14 @@ def format_args(args):
 def make_dirs(logs=None, make_them=None, args=None):
     for i in make_them:
         if i:
-            os.makedirs(i, exist_ok=True)
-    os.makedirs(logs, exist_ok=True)
+            Path(i).mkdir(parents=True, exist_ok=True)
+    Path(logs).mkdir(parents=True, exist_ok=True)
     current_datetime = datetime.utcnow()
     formatted_datetime = current_datetime.strftime('%Y-%m-%d_%H:%M')
-    script_name = sys.argv[0].split("/")[-1].split(".")[0]
-    log_file = f'{logs}{formatted_datetime.split("_")[0]}_{script_name}.log'
-    sys.stdout = Logger(logfile=log_file)
+    script_name = Path(sys.argv[0]).stem
+    log_file = Path(logs) / f"{formatted_datetime.split('_')[0]}_{script_name}.log"
+
+    sys.stdout = Logger(logfile=str(log_file))
     print(f"\nRun date, UTC: {datetime.utcnow()}")
     if args:
         print(f"Run settings: python3 {sys.argv[0]} {format_args(args)}")
@@ -582,7 +583,6 @@ def iaa_multilabel_tags(my_df, multilabel, ordering_df, min_freq=2):
             "status": status
         })
 
-
     tag_iaa_df = pd.DataFrame(tag_results)
 
     tag_iaa_df = tag_iaa_df.merge(
@@ -737,7 +737,6 @@ def one_row_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res, cross_annotated):
 
 def detailed_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res):
     rows = []
-
     # Binary
     rows.append(iaa_res_bin)
     rows.append(pd.DataFrame([{
@@ -799,9 +798,10 @@ def detailed_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res):
 
 
 RUN = "main_student_groups"  # "main_student_groups", "trial_student_groups"
-my_date = "29June2026"
+my_date = "30June2026"  # 29June2026, 16June2026
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    # these should be portable
     parser.add_argument('--intab', help="", default=f'res/{RUN}/{my_date}_transformed_dataset.tsv')
     parser.add_argument('--interface', help="", default=f'interface/{RUN}/interface_scheme.tsv')
     parser.add_argument('--gold_to', default=f'data/{RUN}/')
@@ -824,7 +824,7 @@ if __name__ == "__main__":
 
     to_rework = df.loc[df["incomplete"] == "yes", ["annotator", "sent_id", "left_context", "text", "right_context",
                                                    "further_context", "date", "dataset", "year"]]
-    to_rework.to_csv(args.reworks + "faulty_incomplete_annotations.tsv", index=False, sep='\t')
+    to_rework.to_csv(os.path.join(args.reworks, "faulty_incomplete_annotations.tsv"), index=False, sep='\t')
 
     # drop them for the IAA analysis and gold generation
     df = df[df["incomplete"] != "yes"]
@@ -840,8 +840,7 @@ if __name__ == "__main__":
     print(df["multiple_groups"].value_counts(dropna=False))
     print('How many sent_ids have multiple groups tagged at least once?')
     print(len(multi_group))
-
-    multi_group.to_csv(args.reworks + "multi_group_sent_ids.tsv", index=False)
+    multi_group.to_csv(os.path.join(args.reworks, "multi_group_sent_ids.tsv"), index=False)
 
     # ---- Subsetting data for IAA and adjudication ----
     triple_or_more_annotated_items = df.groupby("sent_id").filter(lambda x: x["annotation_id"].nunique() >= 3)
@@ -864,7 +863,7 @@ if __name__ == "__main__":
 
     print("\nTag coverage in triple-annotated data")
     print(triple_coverage)
-    triple_coverage.to_csv(f'{args.res}/triple_tag_coverage.csv', sep='\t', index=False)
+    triple_coverage.to_csv(os.path.join(args.res, "triple_tag_coverage.csv"), sep='\t', index=False)
 
     # define types of variables for IAA and gold standard generation
 
@@ -898,8 +897,8 @@ if __name__ == "__main__":
     print("\nDetailed IAA results:")
     detailed = detailed_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res)
     print(detailed)
-    detailed.to_csv(f'{args.res}iaa_summary.tsv', sep='\t', index=False)
-    print(f"IAA summary saved to {args.res}iaa_summary.tsv\n")
+    detailed.to_csv(os.path.join(args.res, "iaa_summary.tsv"), sep='\t', index=False)
+    print(f"IAA summary saved to {args.res}iaa_summary.tsv")
 
     # separately look at IAA per-tag in group-tags
     tag_iaa_res = iaa_multilabel_tags(cross_annotated2, "group_tags", interface_df, min_freq=5)
@@ -973,7 +972,7 @@ if __name__ == "__main__":
     print("\nReport on low-frequency tags (skipped for IAA calculation):")
     print(low_freq_report.to_string(index=False))
 
-    low_freq_report.to_csv(f'{args.res}/low_freq_group_tags_report.tsv', sep='\t', index=False)
+    low_freq_report.to_csv(os.path.join(args.res, "low_freq_group_tags_report.tsv"), sep='\t', index=False)
 
     # does alpha deteriorate for infrequent labels
     rare_analysis = (
@@ -1001,7 +1000,7 @@ if __name__ == "__main__":
     # replace human-readable values with category-value codes using the scheme map
     # For binary variables, majority vote is "yes" if at least 2 annotators said "yes", otherwise "no".
 
-    # majority vote and add 'n_disagrements' for each sent_id out of 10 decisions
+    # majority vote and add 'disagrements' for each sent_id out of 10 decisions
     # (1 binary variable + 1 multi-label variable + 11 multiclass variable)
     print(cross_annotated["group_appealed"].unique())  # ['no' 'NA' 'yes']
 
@@ -1012,9 +1011,11 @@ if __name__ == "__main__":
                                meth_disagree="strict")
 
     # save adjudicate ids to send these items for revision
-    to_adjudicate = gold_df.loc[gold_df["adjudicate"] == "yes", ["sent_id", "adjudicate", "text"]]
+    to_adjudicate = gold_df.loc[
+        gold_df["adjudicate"] == "yes", ["annotator", "sent_id", "left_context", "text", "right_context",
+                                         "further_context", "date", "dataset", "year"]]
 
-    to_adjudicate.to_csv(f"{args.reworks}/adjudicate_them.tsv", sep="\t", index=False)
+    to_adjudicate.to_csv(os.path.join(args.reworks, "adjudicate_them.tsv"), sep="\t", index=False)
 
     # drop rows where incomplete or adjudicate = "yes" for the gold standard, as these need to be revised by annotators
     gold_df_out = gold_df.loc[gold_df["adjudicate"] == "no"].reset_index(drop=True)
@@ -1027,8 +1028,7 @@ if __name__ == "__main__":
 
     print("\nDisagreement range:", gold_df_out["disagreement"].min(), "-", gold_df_out["disagreement"].max())
     print("Mean:", round(gold_df_out["disagreement"].mean(), 2))
-    # gold_df_out.to_csv(f'{args.res}/gold_dataset.tsv', sep='\t', index=False)
-    gold_df_out.to_csv(f'{args.gold_to}{my_date}_gold_dataset.tsv', sep='\t', index=False)
+    gold_df_out.to_csv(os.path.join(args.gold_to, f"{my_date}_gold_dataset.tsv"), sep='\t', index=False)
 
     # --- Additional statistics --
     # statistics on binary variables: how many "yes" items per variable
@@ -1050,7 +1050,7 @@ if __name__ == "__main__":
     )
 
     bases = ['triple', "gold"]
-    datas = [cross_annotated, gold_df_out]  # len(triple) == 771, len(gold) == 257
+    datas = [cross_annotated, gold_df_out]
 
     for base, anno_df in zip(bases, datas):
         variables = [v for v in base_binary_variables if v in anno_df.columns]
@@ -1110,10 +1110,9 @@ if __name__ == "__main__":
         )
 
         print(binary_summary)
-        binary_summary.to_csv(f'{args.res}/yes_counts_{base}.tsv', sep='\t', index=False)
-        plot_binary_summary(binary_summary, save_as=f"{args.pics}/yes_counts_{base}.png", show=True)
+        binary_summary.to_csv(os.path.join(args.res, f"yes_counts_{base}.tsv"), sep='\t', index=False)
+        plot_binary_summary(binary_summary, save_as=os.path.join(args.pics, f"yes_counts_{base}.png"), show=True)
 
-    # The JSON is much richer than the TSV.
     end = time.time()
     elapsed_time = (end - start) / 60
     if elapsed_time < 60:

@@ -1,4 +1,5 @@
 """
+UPD: 30 June 2026
 20 June 2026
 Maria Kunilovskaya
 
@@ -7,7 +8,7 @@ This module contains functions for post-processing the output of Label Studio, a
 17 Jun 2026
 Using a tsv file with annotated items from Label Studio export:
 -- make sense of the structure to see how each task is represented in the output
--- get quantitative desctiption of the annptated data (e.g. how many items, how many labels, etc.)
+-- get quantitative description of the annotated data (e.g. how many items, how many labels, etc.)
 -- describe performance by annotator (how many tasks were done by each)
 -- how many tasks are cross-annotated,
 -- prepare the input for IAA and gold standard creation
@@ -18,7 +19,8 @@ Using a tsv file with annotated items from Label Studio export:
     # Task 3: How is the group invoked in the argument? What is the nature of the group appeal? <-- 3 single multiple choice, 1 multi-multiple choice
 
 USAGE:
-set the required RUN parameter RUN = "trial_student_groups"  # "main_student_groups"
+set the required RUN parameters: RUN = "main_student_groups"  # "trial_student_groups"
+and my_date = "29June2026"  # 16June2026
 python3 raw_to_data.py
 
 """
@@ -209,13 +211,14 @@ def format_args(args):
 def make_dirs(logs=None, make_them=None, args=None):
     for i in make_them:
         if i:
-            os.makedirs(i, exist_ok=True)
-    os.makedirs(logs, exist_ok=True)
+            Path(i).mkdir(parents=True, exist_ok=True)
+    Path(logs).mkdir(parents=True, exist_ok=True)
     current_datetime = datetime.utcnow()
     formatted_datetime = current_datetime.strftime('%Y-%m-%d_%H:%M')
-    script_name = sys.argv[0].split("/")[-1].split(".")[0]
-    log_file = f'{logs}{formatted_datetime.split("_")[0]}_{script_name}.log'
-    sys.stdout = Logger(logfile=log_file)
+    script_name = Path(sys.argv[0]).stem
+    log_file = Path(logs) / f"{formatted_datetime.split('_')[0]}_{script_name}.log"
+
+    sys.stdout = Logger(logfile=str(log_file))
     print(f"\nRun date, UTC: {datetime.utcnow()}")
     if args:
         print(f"Run settings: python3 {sys.argv[0]} {format_args(args)}")
@@ -548,9 +551,10 @@ def throughput(df, available_str=None):  # return a df with columns: parameter, 
 
 
 RUN = "main_student_groups"  # "main_student_groups", "trial_student_groups"
-my_date = "29June2026"  # 16June2026
+my_date = "30June2026"  # 16June2026
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    # this should be portable
     parser.add_argument('--indir', help="", default=f'data/{RUN}/')
     parser.add_argument('--interface', help="", default=f'interface/{RUN}/interface_scheme.tsv')
     parser.add_argument('--res', default=f'res/{RUN}/')
@@ -594,10 +598,38 @@ if __name__ == "__main__":
                  'group_appeal_detection', 'scheme_feedback', 'id'
                  ]]
 
+    # drop items that have empty "annotation_id"
+    print("\nDropping items with empty annotation_id...")
+    print(df.shape)
+    df = df[df["annotation_id"].notna()]
+    print(df.shape)
+
     annotated_items = throughput(df, available_str=avail)
     print("\nAnnotated items:")
     print(annotated_items)
-    annotated_items.to_csv(f'{args.res}annotated_items.tsv', sep="\t", index=False)
+    annotated_items.to_csv(os.path.join(args.res, "annotated_items.tsv"), sep="\t", index=False)
+
+    # export scheme feedback for review: get sent_id, text, scheme_feedback, annotator
+    comments = df.loc[df["scheme_feedback"].notna(), ["sent_id", "text", "scheme_feedback", "annotator"]]
+
+    # aggregate by sent_id and text, combine scheme_feedback and annotator into lists
+    comments = (
+        comments.groupby(["sent_id", "text"], as_index=False)
+        .agg(
+            scheme_feedback=("scheme_feedback", lambda x: list(x)),
+            annotator=("annotator", lambda x: list(x)),
+        )
+    )
+    comments.to_csv(os.path.join(args.res, "scheme_feedback.tsv"), sep="\t", index=False)
+
+    print(f"\nNumber of comments in the dataset: {len(comments)}")
+    commented_sent_ids = comments["sent_id"].unique().tolist()
+    print(f"\nAll commented sent_ids:\n\t{commented_sent_ids}")
+
+    sent_ids = comments.loc[comments["scheme_feedback"].str.len() >= 2, "sent_id"].tolist()
+
+    if sent_ids:
+        print(f"\nNumber of sent_ids with 2+ comments: \n\t{len(sent_ids)}")
 
     if RUN == "trial_student_groups":
         group_cats = ['age', 'gender_sexuality', 'family', 'disability',
@@ -686,7 +718,7 @@ if __name__ == "__main__":
         axis=1,
     )
 
-    # keep only the columns you want in the gold dataset, i.e. drop original and technical columns:
+    # keep only the columns you want in the transformed dataset, i.e. drop original and technical columns:
     # e.g. group_appeal_detection, frame_flags, polarity_flags, stance_flags, focus_flags, 'scheme_feedback', etc
     df = df[['annotation_id', 'annotator', 'sent_id', 'updated_at',
              'group_mentioned', 'group_appealed', 'intersectional', 'multiple_groups', 'opposed_groups', 'pejorative',
@@ -695,6 +727,8 @@ if __name__ == "__main__":
              'incomplete',
              'text', 'left_context', 'right_context', 'further_context', 'year', 'date', 'dataset'
              ]]
+
+    # ==== EXPLICIT handling of NA values for subsequent annotation decisions ====
     # because the scheme is hierarchical, many variable become binary only after group mention is detected
     # i.e. in the full dataset, they should include NA, e.g. group_appeal_detection is non-binary: yes, no, NA
     # for IAA, for subsequent categories we need to drop items where Annotators disagree on group mention
@@ -718,7 +752,7 @@ if __name__ == "__main__":
 
     print(df[["annotator", "sent_id", "group_mentioned", "group_appealed", "group_tags", "reasoning", "stance"]].head())
 
-    df.to_csv(f'{args.res}{my_date}_transformed_dataset.tsv', sep="\t", index=False)
+    df.to_csv(os.path.join(args.res, f"{my_date}_transformed_dataset.tsv"), sep="\t", index=False)
 
     # # --- INSPECT UNSEEN TAGS ---
     interface_df = pd.read_csv(args.interface, sep='\t')
@@ -727,7 +761,7 @@ if __name__ == "__main__":
 
     print("\nTag coverage in global annotation")
     print(global_coverage)
-    global_coverage.to_csv(f'{args.res}/global_tag_coverage.csv', sep='\t', index=False)
+    global_coverage.to_csv(os.path.join(args.res, "global_tag_coverage.tsv"), sep='\t', index=False)
 
     # --- Additional statistics --
     # statistics on binary variables: how many "yes" items per variable
@@ -742,7 +776,6 @@ if __name__ == "__main__":
     ]
     base = "global"
 
-    print(f"\n{base.upper()} ANNOTATED ITEMS")
     binary_summary = pd.DataFrame(
         [
             {
@@ -773,10 +806,10 @@ if __name__ == "__main__":
         ignore_index=True
     )
 
+    print(f"\n{base.upper()} YES counts for binarizable annotation decisions:")
     print(binary_summary)
-    binary_summary.to_csv(f'{args.res}/yes_counts_{base}.tsv', sep='\t', index=False)
-
-    plot_binary_summary(binary_summary, save_as=f"{args.pics}/yes_counts_{base}.png")
+    binary_summary.to_csv(os.path.join(args.res, f"yes_counts_{base}.tsv"), sep='\t', index=False)
+    plot_binary_summary(binary_summary, save_as=os.path.join(args.pics, f"yes_counts_{base}.png"), show=True)
 
     end = time.time()
     elapsed_time = (end - start) / 60

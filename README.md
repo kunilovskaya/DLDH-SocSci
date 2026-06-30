@@ -1,5 +1,48 @@
 # Evaluating LLMs as Annotators
 
+## Materials supporting the teaching session
+
+*Deep Learning in NLP (DLDH-SocSci)*
+Groups 2 and 3 – RISS Annotation Scheme
+23, 30 June 2026
+
+UPD: 30 June 2026, 18.00
+
+## Major changes since the original version (23 June 2026)
+
+* Added a plug-and-play implementation for `RUN=main_student_groups` and `my_date=30June2026`, covering all **520** `sent_id`s currently available for annotation.
+* Updated the anonymised raw annotation files (latest annotation: **30 June 2026, 14:11**). See `data/main_student_groups/`.
+* Generated the corresponding gold dataset:
+
+  * `data/main_student_groups/30June2026_gold_dataset.tsv`
+  * Reproducible workflow:
+
+    1. `python3 raw_to_data.py` – transforms the raw annotations and produces global annotation statistics.
+    2. `python3 iaa_and_gold.py` – computes inter-annotator agreement (IAA) and generates the gold dataset.
+* Added explicit handling of `NA` values for downstream annotation decisions.
+* Refactored the IAA calculation into a hierarchical workflow.
+* Separated IAA computation for:
+
+  * binary and multiclass variables,
+  * multilabel categories.
+* Added dedicated exports for:
+
+  * reviewer comments,
+  * items containing multiple groups,
+  * incomplete annotations requiring review.
+  
+* Fixed a number of minor issues, including:
+
+  * interface inventories of labels and label codes,
+  * team alias handling,
+  * various consistency fixes.
+* Substantially updated `zero-shot.ipynb` (not yet fully tested due to persistent Google Colab usage limits; further updates will follow).
+* Ported the scripts for cross-platform compatibility (Linux and Windows). Thanks to everyone who reported portability issues.
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kunilovskaya/DLDH-SocSci/blob/main/zero-shot.ipynb)
+
+
+--- 
 Materials supporting the teaching session:
 
 **Deep Learning in NLP (DLDH-SocSci)**
@@ -18,7 +61,7 @@ referred to as "main_student_groups".
 
 * Post-processing scripts for:
 
-  * transforming annotations into analysis-ready datasets;
+  * transforming annotations into an analysis-ready dataset;
   * computing human–human inter-annotator agreement (IAA);
   * generating majority-vote gold standards.
   * label distribution analysis
