@@ -30,6 +30,227 @@ import numpy as np
 from collections import Counter
 
 
+DEFAULTS = {
+    "group_mentioned": "no",
+    "group_appealed": "NA",
+    "multiple_groups": "NA",
+    "opposed_groups": "NA",
+    "pejorative": "NA",
+    "intersectional": "NA",
+    "group_tags": ["NA"],
+    "reasoning": "NA",
+    "polarity": "NA",
+    "stance": "NA",
+}
+
+# after group_appeal=no
+BINARY_FIELDS = [
+    "group_mentioned",
+    "group_appealed",
+    "multiple_groups",
+    "opposed_groups",
+    "pejorative",
+    "intersectional",
+]
+
+MULTICLASS_FIELDS = [
+    "reasoning",
+    "polarity",
+    "stance",
+]
+
+
+def adjudicate_id(cur_group):
+    # copy data from first annotation
+    gold = cur_group.iloc[0].copy()
+
+    gold["annotator"] = "gold"
+    gold["updated_at"] = date.today().isoformat()
+    gold["adjudicate"] = "no"
+
+    ############################################################
+    # 1. group_mentioned
+    ############################################################
+
+    value, needs_adj = majority_vote(cur_group["group_mentioned"])
+
+    gold["group_mentioned"] = value
+
+    if needs_adj:
+        gold["adjudicate"] = "yes"
+
+    if value != "yes":
+        # not applicable: everything else becomes defaults
+        for field, default in DEFAULTS.items():
+            if field != "group_mentioned":
+                gold[field] = default
+        return gold
+    ############################################################
+    # 2. group_appealed
+    ############################################################
+
+    value, needs_adj = majority_vote(cur_group["group_appealed"])
+
+    gold["group_appealed"] = value
+
+    if needs_adj:
+        gold["adjudicate"] = "yes"
+
+    if value != "yes":
+        for field, default in DEFAULTS.items():
+            if field not in ("group_mentioned", "group_appealed"):
+                gold[field] = default
+
+        return gold
+    ############################################################
+    # 3. Remaining binary variables
+    ############################################################
+
+    for field in (
+        "multiple_groups",
+        "opposed_groups",
+        "pejorative",
+        "intersectional",
+    ):
+        value, needs_adj = majority_vote(cur_group[field])
+
+        gold[field] = value
+
+        if needs_adj:
+            gold["adjudicate"] = "yes"
+
+    ############################################################
+    # 4. Group tags
+    ############################################################
+
+    tags, needs_adj = majority_vote_list(cur_group["group_tags"])
+
+    gold["group_tags"] = tags
+
+    if needs_adj:
+        gold["adjudicate"] = "yes"
+
+    ############################################################
+    # 5. Remaining multiclass variables
+    ############################################################
+
+    for field in (
+        "reasoning",
+        "polarity",
+        "stance",
+    ):
+        value, needs_adj = majority_vote(cur_group[field])
+
+        gold[field] = value
+
+        if needs_adj:
+            gold["adjudicate"] = "yes"
+
+    return gold
+
+
+def count_disagreement(cur_group, method="relaxed"):
+    """
+    Count disagreements among three annotations for one sentence.
+
+    Parameters
+    ----------
+    cur_group : DataFrame
+        Three annotations for one sent_id.
+    method : {"relaxed", "strict"}
+
+    Returns
+    -------
+    int
+    """
+
+    score = 0
+
+    def disagreement(series):
+        vals = pd.unique(series)
+        if method == "relaxed":
+            return int(len(vals) > 1)
+        else:
+            return len(vals) - 1
+
+    ##########################################################
+    # group_mentioned
+    ##########################################################
+
+    score += disagreement(cur_group["group_mentioned"])
+
+    gm, _ = majority_vote(cur_group["group_mentioned"])
+    # we don't need to process further
+    if gm != "yes":
+        return score
+
+    ##########################################################
+    # group_appealed
+    ##########################################################
+
+    score += disagreement(cur_group["group_appealed"])
+
+    ga, _ = majority_vote(cur_group["group_appealed"])
+    if ga != "yes":
+        return score
+
+    ##########################################################
+    # Remaining binary fields
+    ##########################################################
+
+    for field in (
+        "multiple_groups",
+        "opposed_groups",
+        "pejorative",
+        "intersectional",
+    ):
+        score += disagreement(cur_group[field])
+
+    ##########################################################
+    # group_tags
+    ##########################################################
+
+    if method == "relaxed":
+
+        tag_sets = {
+            tuple(sorted(tags))
+            for tags in cur_group["group_tags"]
+            if isinstance(tags, list)
+        }
+        # Relaxed:
+        # +0 if all annotators assigned exactly the same tag set.
+        # +1 if at least one annotator assigned a different tag set.
+        score += int(len(tag_sets) > 1)
+
+    else:
+
+        counter = Counter()
+
+        for tags in cur_group["group_tags"]:
+            if isinstance(tags, list):
+                counter.update(tags)
+        # Strict:
+        # Count the number of tags that were not assigned
+        # by all three annotators (i.e., frequency < 3).
+        score += sum(
+            count != 3
+            for count in counter.values()
+        )
+
+    ##########################################################
+    # Multiclass fields
+    ##########################################################
+
+    for field in (
+        "reasoning",
+        "polarity",
+        "stance",
+    ):
+        score += disagreement(cur_group[field])
+
+    return score
+
+
 def percentage_agreement(matrix):
     """
     matrix:
@@ -332,106 +553,112 @@ def diagnose_category(df_iaa=None, prefix='EDU_'):
             print(sent_id, list(vals), "DISAGREE")
 
 
-def adjudicate_items(my_df=None, binary=None, multilabel=None, multiclass=None, meth_gold="relaxed",
-                     meth_disagree="relaxed"):
-    gold_rows = []
-    for sent_id, group in my_df.groupby("sent_id"):
-
-        gold = group.iloc[0].copy()
-
-        gold["annotator"] = "gold"
-        gold["annotation_id"] = -1
-        gold["updated_at"] = date.today().isoformat()
-        # gold["updated_at"] = pd.Timestamp.now(tz="Europe/Berlin")
-
-        gold["adjudicate"] = "no"  # set default value
-        gold["disagreement"] = 0
-        # On how many variables did annotators disagree for current sent_id?
-        n_disagreements = 0
-
-        for variable in binary:
-
-            vals = group[variable].dropna().unique()
-            # yes yes yes -> 0
-            # yes yes no  -> 1
-            if len(vals) > 1:
-                n_disagreements += 1
-
-            # if adjudicate, gold == None
-            # returns yes/no or np.nan
-            gold[variable], needs_adj_binary = majority_vote(group[variable], threshold=2)
-
-            if needs_adj_binary:
-                gold["adjudicate"] = "yes"
-
-        for variable in multiclass:
-            # safegarding against annotation errors, avoid looking at items without annotatable content
-            if gold["group_appealed"] == "yes":
-                vals = pd.unique(group[variable])
-                if len(vals) > 1:
-                    # A A A -> 0
-                    # A A B -> +1
-                    # A B C -> +2
-                    n_disagreements += len(vals) - 1
-                try:
-                    gold[variable], needs_adj_binary = majority_vote(group[variable])
-                except IndexError:
-                    needs_adj_binary = True
-                    gold[variable] = np.nan
-
-                if needs_adj_binary:
-                    gold["adjudicate"] = "yes"
-        if gold["group_appealed"] == "yes":
-            # multilabel category:
-            # Gold standard is a counterfactual based on majority vote for each tag, i.e.,
-            # if at least 2 annotators assigned a tag, it is included in the gold standard.
-
-            # A: [AGE_CHILD, FAM_FAMILIES]
-            # B: [AGE_CHILD]
-            # C: [FAM_FAMILIES]
-            tags_group, needs_adj_group = majority_vote_list(group[multilabel[0]])
-            gold["group_tags"] = tags_group
-
-            group_tag_sets = {
-                tuple(sorted(tags))
-                for tags in group["group_tags"]
-                if isinstance(tags, list)
-            }
-            if needs_adj_group:
-                gold["adjudicate"] = "yes"
-            if meth_disagree == 'relaxed':
-                # On how many variables did annotators disagree?
-                # [A]
-                # [A]
-                # [B] = +1
-
-                # [A, B, C]
-                # [A]
-                # [D] = +1
-                if len(group_tag_sets) > 1:
-                    n_disagreements += 1
-            else:
-                # On how many variables did annotators disagree?
-                # how many annotation decisions were contested?
-                # [A][A][B] = +1, adj = no
-                # [A,B,C][A][D] = +3, adj = no
-                counter = Counter()
-
-                for tags in group["group_tags"]:
-                    counter.update(tags)
-
-                n_disagreements += sum(
-                    1
-                    for count in counter.values()
-                    if count != 3
-                )
-
-        gold["disagreement"] = n_disagreements
-        gold_rows.append(gold)
-
-    _gold_df = pd.DataFrame(gold_rows)
-
-    return _gold_df
+# def adjudicate_items(my_df=None, binary=None, multilabel=None, multiclass=None, meth_gold="relaxed",
+#                      meth_disagree="relaxed"):
+#
+#     gold_rows = []
+#     for sent_id, group in my_df.groupby("sent_id"):
+#         print(sent_id)
+#         print(group[["group_mentioned", "group_appealed"]])
+#         gold = group.iloc[0].copy()  # use the first annotation as template for gold
+#
+#         gold["annotator"] = "gold"
+#         gold["annotation_id"] = -1
+#         gold["updated_at"] = date.today().isoformat()
+#
+#         gold["adjudicate"] = "no"  # set default value
+#         gold["disagreement"] = 0
+#         # On how many variables did annotators disagree for current sent_id?
+#         n_disagreements = 0
+#
+#         for variable in binary:
+#
+#             vals = group[variable].dropna().unique()
+#             # yes yes yes -> 0
+#             # yes yes no  -> 1
+#             if len(vals) > 1:
+#                 n_disagreements += 1
+#
+#             # if adjudicate, gold == None
+#             # returns yes/no or np.nan
+#             gold[variable], needs_adj_binary = majority_vote(group[variable], threshold=2)
+#
+#             if needs_adj_binary:
+#                 gold["adjudicate"] = "yes"
+#
+#         for variable in multiclass:
+#             if variable == "group_appealed":
+#                 vals = group["group_appealed"]
+#                 if vals.isna().any():
+#                     print(sent_id)
+#                     print(group["group_appealed"].map(repr))
+#                     exit()
+#             # safegarding against annotation errors, avoid looking at items without annotatable content
+#             if gold["group_appealed"] == "yes":
+#                 vals = pd.unique(group[variable])
+#                 if len(vals) > 1:
+#                     # A A A -> 0
+#                     # A A B -> +1
+#                     # A B C -> +2
+#                     n_disagreements += len(vals) - 1
+#                 try:
+#                     gold[variable], needs_adj_binary = majority_vote(group[variable])
+#                 except IndexError:
+#                     needs_adj_binary = True
+#                     gold[variable] = np.nan
+#
+#                 if needs_adj_binary:
+#                     gold["adjudicate"] = "yes"
+#         if gold["group_appealed"] == "yes":
+#             # multilabel category:
+#             # Gold standard is a counterfactual based on majority vote for each tag, i.e.,
+#             # if at least 2 annotators assigned a tag, it is included in the gold standard.
+#
+#             # A: [AGE_CHILD, FAM_FAMILIES]
+#             # B: [AGE_CHILD]
+#             # C: [FAM_FAMILIES]
+#             tags_group, needs_adj_group = majority_vote_list(group[multilabel[0]])
+#             gold["group_tags"] = tags_group
+#
+#             group_tag_sets = {
+#                 tuple(sorted(tags))
+#                 for tags in group["group_tags"]
+#                 if isinstance(tags, list)
+#             }
+#             if needs_adj_group:
+#                 gold["adjudicate"] = "yes"
+#             if meth_disagree == 'relaxed':
+#                 # On how many variables did annotators disagree?
+#                 # [A]
+#                 # [A]
+#                 # [B] = +1
+#
+#                 # [A, B, C]
+#                 # [A]
+#                 # [D] = +1
+#                 if len(group_tag_sets) > 1:
+#                     n_disagreements += 1
+#             else:
+#                 # how many labels do not have majority agreement?
+#                 # [A][A][B] = +1, adj = no
+#                 # [A,B,C][A][D] = +3, adj = no
+#                 counter = Counter()
+#
+#                 for tags in group["group_tags"]:
+#                     counter.update(tags)
+#
+#                 n_disagreements += sum(
+#                     1
+#                     for count in counter.values()
+#                     if count != 3
+#                 )
+#
+#         gold["disagreement"] = n_disagreements
+#         gold_rows.append(gold)
+#
+#     _gold_df = pd.DataFrame(gold_rows)
+#
+#     return _gold_df
 
 
 def iaa_binary_multiclass(my_df, my_vars):
@@ -866,7 +1093,6 @@ if __name__ == "__main__":
     triple_coverage.to_csv(os.path.join(args.res, "triple_tag_coverage.csv"), sep='\t', index=False)
 
     # define types of variables for IAA and gold standard generation
-
     class_vars = ['intersectional', 'multiple_groups', 'opposed_groups', 'pejorative',
                   'reasoning', 'polarity', 'stance']
 
@@ -1000,15 +1226,17 @@ if __name__ == "__main__":
     # replace human-readable values with category-value codes using the scheme map
     # For binary variables, majority vote is "yes" if at least 2 annotators said "yes", otherwise "no".
 
-    # majority vote and add 'disagrements' for each sent_id out of 10 decisions
-    # (1 binary variable + 1 multi-label variable + 11 multiclass variable)
-    print(cross_annotated["group_appealed"].unique())  # ['no' 'NA' 'yes']
+    # majority vote and disagreement score for each sent_id
+    gold_rows = []
 
-    multiclass_vars = ['group_appealed', 'intersectional', 'multiple_groups', 'opposed_groups', 'pejorative',
-                       'reasoning', 'polarity', 'stance', 'reasoning', 'polarity', 'stance']
-    gold_df = adjudicate_items(my_df=cross_annotated, binary=["group_mentioned"],
-                               multilabel=["group_tags"], multiclass=multiclass_vars,
-                               meth_disagree="strict")
+    for sent_id, group in cross_annotated.groupby("sent_id"):
+        gold_row = adjudicate_id(group)
+
+        gold_row["disagreement"] = count_disagreement(group, method="strict")
+
+        gold_rows.append(gold_row)
+
+    gold_df = pd.DataFrame(gold_rows)
 
     # save adjudicate ids to send these items for revision
     to_adjudicate = gold_df.loc[
@@ -1042,12 +1270,7 @@ if __name__ == "__main__":
         'adjudicate',
     ]
 
-    failed_adjudications = (
-        gold_df
-        .groupby("sent_id")["adjudicate"]
-        .apply(lambda x: (x == "yes").any())
-        .sum()
-    )
+    failed_adjudications = (gold_df["adjudicate"] == "yes").sum()
 
     bases = ['triple', "gold"]
     datas = [cross_annotated, gold_df_out]
@@ -1110,6 +1333,7 @@ if __name__ == "__main__":
         )
 
         print(binary_summary)
+
         binary_summary.to_csv(os.path.join(args.res, f"yes_counts_{base}.tsv"), sep='\t', index=False)
         plot_binary_summary(binary_summary, save_as=os.path.join(args.pics, f"yes_counts_{base}.png"), show=True)
 

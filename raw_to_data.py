@@ -629,7 +629,7 @@ if __name__ == "__main__":
     sent_ids = comments.loc[comments["scheme_feedback"].str.len() >= 2, "sent_id"].tolist()
 
     if sent_ids:
-        print(f"\nNumber of sent_ids with 2+ comments: \n\t{len(sent_ids)}")
+        print(f"\nNumber of sent_ids with 2+ comments: {len(sent_ids)}")
 
     if RUN == "trial_student_groups":
         group_cats = ['age', 'gender_sexuality', 'family', 'disability',
@@ -700,9 +700,10 @@ if __name__ == "__main__":
     df["intersectional"] = df.apply(lambda row: "yes" if len(row["group_tags"]) > 1 else "no", axis=1)
 
     df = df.rename(columns={'frame_flags': 'reasoning', 'polarity_flags': 'polarity', 'stance_flags': 'stance'})
-    appeal_cols = ["reasoning", "polarity", "stance"]
+
     # SANITY CHECK 2:
     # if there are any nans in appeal_tags and group_appeal_detection is "yes", put incomplet=="yes", else "no"
+    appeal_cols = ["reasoning", "polarity", "stance"]
     df["incomplete"] = df.apply(
         lambda row: (
             "yes"
