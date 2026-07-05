@@ -667,7 +667,7 @@ def iaa_binary_multiclass(my_df, my_vars):
     df_iaa["updated_at"] = pd.to_datetime(df_iaa["updated_at"])
     df_iaa = (
         df_iaa.sort_values("updated_at")
-        .groupby(["sent_id", "annotator"], as_index=False, observed=True)
+        .groupby(["sent_id", "annotator"], as_index=False, observed=True)  # only uses combinations that actually occur
         .tail(1)
     )
     # ----------------------------
@@ -762,6 +762,8 @@ def iaa_multilabel_tags(my_df, multilabel, ordering_df, min_freq=2):
                 "agree_pct": np.nan,
                 "alpha": np.nan,
                 "tag_freq": int(positive_count),  # how many sentences have this tag
+                "n_items": n_items,
+                "n_values": 2,
                 "status": "too_rare"
             })
             continue
@@ -1024,8 +1026,8 @@ def detailed_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res):
     return summary_df
 
 
-RUN = "trial_student_groups"  # "main_student_groups", "trial_student_groups"
-my_date = "16June2026"  # 29June2026, 16June2026
+RUN = "main_student_groups"  # "main_student_groups", "trial_student_groups"
+my_date = "30June2026"  # 29June2026, 16June2026
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # these should be portable
@@ -1138,13 +1140,20 @@ if __name__ == "__main__":
     print(f"\nPer-tag IAA is not defined for {n_dropped} (of {len(tag_iaa_res)})")
     tag_iaa_res_valid = tag_iaa_res_valid.drop(["status"], axis=1)
     # aggregate: add Avg row and round as before
+    tag_freq_mean = pd.to_numeric(
+        tag_iaa_res_valid["tag_freq"], errors="coerce"
+    ).mean()
     avg_row = pd.DataFrame({
         "variable_type": ["Average"],
         "category": [""],
         "variable": [""],
-        "agree_pct": [tag_iaa_res_valid["agree_pct"].mean().round(2)],
-        "alpha": [tag_iaa_res_valid["alpha"].mean().round(3)],
-        "tag_freq": [tag_iaa_res_valid["tag_freq"].mean().round(1)],
+        "agree_pct": [round(tag_iaa_res_valid["agree_pct"].mean(), 2)],
+        "alpha": [round(tag_iaa_res_valid["alpha"].mean(), 3)],
+        "tag_freq": [round(tag_freq_mean, 1) if pd.notna(tag_freq_mean) else pd.NA],
+        # "tag_freq": [round(tag_iaa_res_valid["tag_freq"].mean(), 1)],
+        # "agree_pct": [tag_iaa_res_valid["agree_pct"].mean().round(2)],
+        # "alpha": [tag_iaa_res_valid["alpha"].mean().round(3)],
+        # "tag_freq": [tag_iaa_res_valid["tag_freq"].mean().round(1)],
         "n_items": ["--"],
         "n_values": ["--"],
     })
