@@ -667,7 +667,7 @@ def iaa_binary_multiclass(my_df, my_vars):
     df_iaa["updated_at"] = pd.to_datetime(df_iaa["updated_at"])
     df_iaa = (
         df_iaa.sort_values("updated_at")
-        .groupby(["sent_id", "annotator"], as_index=False)
+        .groupby(["sent_id", "annotator"], as_index=False, observed=True)
         .tail(1)
     )
     # ----------------------------
@@ -1024,8 +1024,8 @@ def detailed_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res):
     return summary_df
 
 
-RUN = "main_student_groups"  # "main_student_groups", "trial_student_groups"
-my_date = "30June2026"  # 29June2026, 16June2026
+RUN = "trial_student_groups"  # "main_student_groups", "trial_student_groups"
+my_date = "16June2026"  # 29June2026, 16June2026
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # these should be portable
@@ -1118,6 +1118,7 @@ if __name__ == "__main__":
 
     iaa_res_bin = pd.concat([iaa_res_mention, iaa_res_appealed], ignore_index=True)
     mini_res = one_row_summary(iaa_res_bin, iaa_res_multi, cat_iaa_res, cross_annotated)
+    print()
     print(mini_res.to_string(index=False))
 
     print("\nDetailed IAA results:")
@@ -1133,6 +1134,7 @@ if __name__ == "__main__":
     tag_iaa_res_valid = tag_iaa_res.dropna(subset=["alpha"]).reset_index(drop=True)
     # count rows with missing alpha
     n_dropped = tag_iaa_res["alpha"].isna().sum()
+
     print(f"\nPer-tag IAA is not defined for {n_dropped} (of {len(tag_iaa_res)})")
     tag_iaa_res_valid = tag_iaa_res_valid.drop(["status"], axis=1)
     # aggregate: add Avg row and round as before
@@ -1257,6 +1259,12 @@ if __name__ == "__main__":
     print("\nDisagreement range:", gold_df_out["disagreement"].min(), "-", gold_df_out["disagreement"].max())
     print("Mean:", round(gold_df_out["disagreement"].mean(), 2))
     gold_df_out.to_csv(os.path.join(args.gold_to, f"{my_date}_gold_dataset.tsv"), sep='\t', index=False)
+
+    # debugging
+    # temp = gold_df[(gold_df["group_appealed"] == "NA") & (gold_df["group_mentioned"] == "yes")]
+    # print(temp[["sent_id", "group_mentioned", "group_appealed", "group_tags"]].head())
+    # print(temp.shape)
+    # exit()
 
     # --- Additional statistics --
     # statistics on binary variables: how many "yes" items per variable
