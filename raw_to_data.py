@@ -551,7 +551,7 @@ def throughput(df, available_str=None):  # return a df with columns: parameter, 
 
 
 RUN = "main_student_groups"  # "main_student_groups", "trial_student_groups"
-my_date = "30June2026"  # 16June2026
+my_date = "07July2026"  # 29June2026, 30June2026
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # this should be portable
